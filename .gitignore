@@ -1,40 +1,53 @@
-# Dependencies
-node_modules/
-venv/
+# General Python/Django
 __pycache__/
-*.pyc
+*.py[cod]
+*.egg-info/
+*.log
+db.sqlite3
+.env
+.env.*
 .pytest_cache/
+coverage/
+htmlcov/
+.mypy_cache/
 
-# Environment variables
+# Virtual environments (local)
+**/venv/
+.venv/
+
+# Node/Next.js Frontend
+node_modules/
+.next/
+out/
+dist/
+build/
+.npm/
+.yarn/
+.pnpm-store/
+
+# WordPress CMS (if self-hosted)
+cms/wp-content/plugins/*
+!cms/wp-content/plugins/.gitkeep
+cms/wp-content/uploads/
+cms/wp-content/upgrade/
+cms/wp-config.php
+
+# Environment files
 .env
 .env.local
 .env.*.local
+.envrc
+*.env
 
-# Build outputs
-dist/
-build/
-*.egg-info/
-.next/
-out/
-
-# IDE and editor files
+# Editors / OS
+.DS_Store
 .idea/
 .vscode/
-*.swp
 *.swo
-.DS_Store
+*.swp
 
-# Logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Coverage reports
-coverage/
-.coverage
-htmlcov/
-
-# Temporary files
+# Temp / backup
 tmp/
-temp/ 
+temp/
+*.bak
+*.tmp
