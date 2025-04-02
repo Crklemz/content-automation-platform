@@ -1,3 +1,7 @@
-from django.shortcuts import render
+from rest_framework.viewsets import ModelViewSet
+from .models import Prompt
+from .serializers import PromptSerializer
 
-# Create your views here.
+class PromptViewSet(ModelViewSet):
+    queryset = Prompt.objects.all()
+    serializer_class = PromptSerializer
