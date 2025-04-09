@@ -16,6 +16,8 @@ from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
+load_dotenv(dotenv_path="/backend/.env")
+load_dotenv(dotenv_path="/cms/.env")
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -138,6 +140,10 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+WP_API_URL = os.getenv("WP_API_URL")
+WP_API_USER = os.getenv("WP_API_USER")
+WP_API_PASSWORD = os.getenv("WP_API_PASSWORD")
 
 # API Settings
 API_VERSION = os.getenv('API_VERSION', 'v1')

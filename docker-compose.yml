@@ -11,5 +11,29 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  wordpress:
+    image: wordpress:6.4
+    restart: always
+    env_file:
+      - cms/.env
+    ports:
+      - "8080:80"
+    depends_on:
+      - wp-db
+    volumes:
+      - cms_data:/var/www/html
+
+  wp-db:
+    image: mysql:8.0
+    restart: always
+    env_file:
+      - cms/.env
+    ports:
+      - "3306:3306"
+    volumes:
+      - wp_db_data:/var/lib/mysql
+
 volumes:
   postgres_data:
+  cms_data:
+  wp_db_data:
