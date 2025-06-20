@@ -40,14 +40,21 @@ A Django + Next.js platform that uses AI to generate and publish weekly articles
 
 ## 📁 Repo Structure
 
-content-automation-platform/
-├── backend/ # Django project
-├── frontend/ # Next.js frontend
-├── assets/ # Logos and branding assets
-├── data/ # site_config.json and prompt templates
-├── .env # Django env vars
-├── .gitignore
-└── README.md
+### `/backend/`
+Django backend code, models, API logic, Celery tasks, and `.env` config.
+
+### `/frontend/`
+Next.js frontend app with Tailwind styling, API fetching, and site branding.
+
+### `/assets/`
+Logos, images, or other static site visuals.
+
+### `/data/`
+Configuration files like `site_config.json` and AI prompt templates.
+
+### Root Files
+- `.gitignore`
+- `README.md`
 
 ---
 
