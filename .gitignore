@@ -32,3 +32,6 @@ Thumbs.db
 *.pid
 *.tar
 docker-compose.override.yml
+
+#Todo List
+TODO.md
