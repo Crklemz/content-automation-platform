@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.sqlite3
+*.log
+*.pot
+*.pyc
+
+# Django
+*.env
+.env
+db.sqlite3
+media/
+staticfiles/
+*.DS_Store
+
+# Node
+node_modules/
+.next/
+.env.local
+.env.development
+.env.production
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# macOS & system files
+.DS_Store
+Thumbs.db
+
+# Docker
+*.pid
+*.tar
+docker-compose.override.yml
