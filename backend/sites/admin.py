@@ -5,5 +5,4 @@ from .models import Site
 
 @admin.register(Site)
 class SiteAdmin(admin.ModelAdmin):
-    list_display = ('title', 'slug', 'topic')
-    search_fields = ('title', 'topic')
+    list_display = ['name', 'slug', 'description']

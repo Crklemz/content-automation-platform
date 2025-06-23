@@ -27,4 +27,5 @@ router.register(r'articles', ArticleViewSet, basename='article')
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include(router.urls)),
+    path("api/sites/", include("sites.urls")),
 ]

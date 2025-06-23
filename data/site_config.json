@@ -1,14 +1,18 @@
 [
   {
     "slug": "ai-skills",
-    "title": "Stay Relevant with AI",
-    "topic": "Artificial Intelligence Skills and Tools",
-    "colors": {
-      "primary": "#1a73e8",
-      "secondary": "#185abc",
-      "tertiary": "#d2e3fc",
-      "quaternary": "#f1f3f4"
-    },
-    "logo": "/images/logos/ai-skills.svg"
+    "name": "AI Skills",
+    "description": "Helping people stay relevant in the AI age.",
+    "primary_color": "#3574a9",
+    "secondary_color": "#c3b4af",
+    "logo": "/assets/ai-skills-logo.svg"
+  },
+  {
+    "slug": "green-living",
+    "name": "Green Living",
+    "description": "Sustainable living made simple.",
+    "primary_color": "#4CAF50",
+    "secondary_color": "#8BC34A",
+    "logo": "/assets/green-living-logo.svg"
   }
 ]
