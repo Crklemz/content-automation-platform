@@ -13,7 +13,7 @@ class Article(models.Model):
 
     site = models.ForeignKey(Site, on_delete=models.CASCADE, related_name='articles')
     title = models.CharField(max_length=200)
-    slug = models.SlugField(unique=True)
+    slug = models.SlugField(unique=True, max_length=200)
     body = models.TextField()
     sources = models.JSONField(blank=True, null=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
