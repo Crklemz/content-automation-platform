@@ -1,3 +1,4 @@
+import ProtectedRoute from '../ProtectedRoute';
 import { Article } from "@/types";
 import { Site, ArticleFilters } from "@/types/admin";
 import ArticleTable from "@/app/admin/articles/ArticleTable";
@@ -90,25 +91,27 @@ export default async function ArticlesPage({ searchParams }: ArticlesPageProps) 
   ]);
 
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Articles</h1>
-          <p className="mt-2 text-gray-600">
-            Manage and review articles across all sites
-          </p>
+    <ProtectedRoute>
+      <div className="space-y-6">
+        {/* Page Header */}
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Articles</h1>
+            <p className="mt-2 text-gray-600">
+              Manage and review articles across all sites
+            </p>
+          </div>
+          <div className="text-sm text-gray-500">
+            {articles.length} article{articles.length !== 1 ? 's' : ''} found
+          </div>
         </div>
-        <div className="text-sm text-gray-500">
-          {articles.length} article{articles.length !== 1 ? 's' : ''} found
-        </div>
+
+        {/* Filters */}
+        <ArticleFiltersComponent sites={sites} currentFilters={filters} />
+
+        {/* Articles Table */}
+        <ArticleTable articles={articles} sites={sites} />
       </div>
-
-      {/* Filters */}
-      <ArticleFiltersComponent sites={sites} currentFilters={filters} />
-
-      {/* Articles Table */}
-      <ArticleTable articles={articles} sites={sites} />
-    </div>
+    </ProtectedRoute>
   );
 } 
