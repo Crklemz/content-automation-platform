@@ -38,6 +38,12 @@ export default function AdminNav() {
               Articles
             </Link>
             <Link 
+              href="/admin/ai-content" 
+              className="text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md text-sm font-medium"
+            >
+              AI Content
+            </Link>
+            <Link 
               href="/admin/sites" 
               className="text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md text-sm font-medium"
             >

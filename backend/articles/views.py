@@ -4,10 +4,13 @@ from django.shortcuts import render
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
 from django_filters import rest_framework as filters
 from django.contrib.auth.models import User
 from django.http import HttpRequest
 from typing import TYPE_CHECKING, cast
+from services.content_automation import ContentAutomation
+from sites.models import Site
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
@@ -83,3 +86,87 @@ class ArticleViewSet(viewsets.ModelViewSet):
         article.status = 'rejected'
         article.save()
         return Response({'status': 'rejected'})
+    
+    @action(detail=False, methods=['post'], permission_classes=[AllowAny])
+    def generate_content(self, request):
+        """Generate AI content for a site"""
+        try:
+            site_slug = request.data.get('site_slug')
+            topic = request.data.get('topic')
+            count = request.data.get('count', 1)
+            
+            if not site_slug:
+                return Response(
+                    {'error': 'site_slug is required'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            try:
+                site = Site.objects.get(slug=site_slug)
+            except Site.DoesNotExist:
+                return Response(
+                    {'error': f'Site with slug "{site_slug}" not found'}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            automation = ContentAutomation()
+            
+            if topic:
+                # Generate content for specific topic
+                article = automation.generate_content_from_topic(topic, site)
+                if article:
+                    return Response({
+                        'message': f'Generated article: {article.title}',
+                        'article_id': article.pk
+                    })
+                else:
+                    return Response(
+                        {'error': 'Failed to generate article'}, 
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                    )
+            else:
+                # Generate content based on trending topics
+                articles = automation.generate_content_for_site(site, count)
+                return Response({
+                    'message': f'Generated {len(articles)} articles for {site.name}',
+                    'article_ids': [article.pk for article in articles]
+                })
+                
+        except Exception as e:
+            return Response(
+                {'error': f'Error generating content: {str(e)}'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=False, methods=['get'], permission_classes=[AllowAny])
+    def trending_topics(self, request):
+        """Get trending topics for content generation"""
+        try:
+            site_slug = request.query_params.get('site_slug')
+            category = request.query_params.get('category', 'general')
+            limit = int(request.query_params.get('limit', 10))
+            
+            automation = ContentAutomation()
+            
+            if site_slug:
+                try:
+                    site = Site.objects.get(slug=site_slug)
+                    topics = automation.get_trending_topics_for_site(site, limit)
+                except Site.DoesNotExist:
+                    return Response(
+                        {'error': f'Site with slug "{site_slug}" not found'}, 
+                        status=status.HTTP_404_NOT_FOUND
+                    )
+            else:
+                topics = automation.get_general_trending_topics(category, limit)
+            
+            return Response({
+                'topics': topics,
+                'count': len(topics)
+            })
+            
+        except Exception as e:
+            return Response(
+                {'error': f'Error fetching trending topics: {str(e)}'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
