@@ -269,33 +269,33 @@ class AIContentGenerator:
         try:
             if not scraped_articles:
                 return {
-                    'title': f"Daily Top 3: {site_description}",
-                    'body': f"Currently, there are limited trending articles available for {site_description}. Please check back later for the latest updates.",
+                    'title': f"Top 3 {site_description}: No Articles Available",
+                    'body': f"<p>Currently, there are limited trending articles available for {site_description}. Please check back later for the latest updates.</p>",
                     'sources': []
                 }
             
-            # Extract sub-categories from article topics
-            sub_categories = []
+            # Extract main topics from each article
+            main_topics = []
             for article in scraped_articles[:3]:
                 topics = article.get('topics', [])
                 if topics:
-                    # Use the first topic as sub-category, or create one from title
-                    sub_category = topics[0].title() if topics else self._extract_sub_category(article.get('title', ''))
-                    sub_categories.append(sub_category)
+                    # Use the first topic as main topic, or create one from title
+                    main_topic = topics[0].replace('_', ' ').title() if topics else self._extract_main_topic(article.get('title', ''))
+                    main_topics.append(main_topic)
                 else:
-                    sub_category = self._extract_sub_category(article.get('title', ''))
-                    sub_categories.append(sub_category)
+                    main_topic = self._extract_main_topic(article.get('title', ''))
+                    main_topics.append(main_topic)
             
-            # Create main title
-            main_title = f"Daily Top 3: {site_description}"
+            # Create main title with main topics
+            main_topics_text = ", ".join(main_topics)
+            # Remove any periods from site description
+            clean_site_description = site_description.rstrip('.')
+            main_title = f"Top 3 {clean_site_description}: {main_topics_text}"
             
-            # Create sub-categories line
-            sub_categories_text = ", ".join(sub_categories)
-            
-            # Create overall summary
+            # Create overall summary of all 3 articles
             overall_summary = self._create_overall_summary(scraped_articles[:3], site_description)
             
-            # Create individual article summaries
+            # Create individual article summaries with proper formatting
             article_summaries = []
             sources = []
             
@@ -304,12 +304,23 @@ class AIContentGenerator:
                 url = article.get('url', '')
                 source = article.get('source', 'Unknown')
                 summary = article.get('summary', '')
+                category = article.get('category', 'General')
+                main_topic = main_topics[i] if i < len(main_topics) else 'General'
                 
-                # Create clickable title
-                clickable_title = f"[{title}]({url})" if url else title
+                # Create clickable title link
+                title_link = f'<a href="{url}" target="_blank" rel="noopener noreferrer" class="article-title-link">{title}</a>' if url else title
                 
-                # Create individual summary with attribution
-                individual_summary = f"{clickable_title}\n\n{summary}\n\n**Source:** [{source}]({url})"
+                # Create individual summary with proper HTML formatting
+                individual_summary = f"""
+                <div class="article-item">
+                    <h3><strong>{title_link}</strong></h3>
+                    <p class="article-summary">{summary}</p>
+                    <div class="article-meta">
+                        <span class="category">{main_topic}</span>
+                        <span class="source">Source: <a href="{url}" target="_blank" rel="noopener noreferrer">{source}</a></span>
+                    </div>
+                </div>
+                """
                 article_summaries.append(individual_summary)
                 
                 # Add to sources list
@@ -319,9 +330,27 @@ class AIContentGenerator:
                     'source': source
                 })
             
-            # Combine everything into the final article
-            article_body = f"{main_title}\n{sub_categories_text}\n\n{overall_summary}\n\n"
-            article_body += "\n\n".join(article_summaries)
+            # Combine everything into the final article with proper HTML structure
+            article_body = f"""
+            <div class="daily-top-3">
+                <div class="overview">
+                    <h2><strong>Today's Trending Summary</strong></h2>
+                    <p>{overall_summary}</p>
+                </div>
+                
+                <div class="articles">
+                    <h2><strong>Top Stories</strong></h2>
+                    {''.join(article_summaries)}
+                </div>
+                
+                <div class="sources">
+                    <h3><strong>Sources and Further Reading</strong></h3>
+                    <ul>
+                        {''.join([f'<li><a href="{source["url"]}" target="_blank" rel="noopener noreferrer">{source["title"]}</a> - {source["source"]}</li>' for source in sources])}
+                    </ul>
+                </div>
+            </div>
+            """
             
             return {
                 'title': main_title,
@@ -332,14 +361,14 @@ class AIContentGenerator:
         except Exception as e:
             print(f"Error generating Daily Top 3 article: {e}")
             return {
-                'title': f"Daily Top 3: {site_description}",
-                'body': f"Error generating content for {site_description}. Please try again later.",
+                'title': f"Top 3 {site_description}: Error Generating Content",
+                'body': f"<p>Error generating content for {site_description}. Please try again later.</p>",
                 'sources': []
             }
     
-    def _extract_sub_category(self, title: str) -> str:
-        """Extract a sub-category from an article title"""
-        # Simple keyword extraction for sub-categories
+    def _extract_main_topic(self, title: str) -> str:
+        """Extract a main topic from an article title"""
+        # Simple keyword extraction for main topics
         title_lower = title.lower()
         
         if any(word in title_lower for word in ['ai', 'artificial intelligence', 'machine learning']):
@@ -350,6 +379,10 @@ class AIContentGenerator:
             return "Business & Innovation"
         elif any(word in title_lower for word in ['health', 'medical', 'wellness']):
             return "Health & Wellness"
+        elif any(word in title_lower for word in ['cybersecurity', 'security', 'privacy']):
+            return "Cybersecurity"
+        elif any(word in title_lower for word in ['cloud', 'aws', 'azure']):
+            return "Cloud Computing"
         else:
             return "Latest Trends"
     
@@ -358,20 +391,44 @@ class AIContentGenerator:
         if not articles:
             return f"Currently, there are limited trending articles available for {site_description}."
         
-        # Extract key themes from articles
+        # Extract key themes and topics from articles
         themes = []
+        topics = []
         for article in articles:
-            topics = article.get('topics', [])
-            themes.extend(topics)
+            article_topics = article.get('topics', [])
+            topics.extend(article_topics)
+            
+            # Extract theme from title and description
+            title = article.get('title', '').lower()
+            description = article.get('description', '').lower()
+            
+            if any(word in title or word in description for word in ['ai', 'artificial intelligence', 'machine learning']):
+                themes.append('Artificial Intelligence')
+            elif any(word in title or word in description for word in ['sustainable', 'green', 'environment', 'climate']):
+                themes.append('Sustainability')
+            elif any(word in title or word in description for word in ['business', 'startup', 'entrepreneur']):
+                themes.append('Business Innovation')
+            elif any(word in title or word in description for word in ['security', 'cybersecurity', 'privacy']):
+                themes.append('Cybersecurity')
+            elif any(word in title or word in description for word in ['cloud', 'aws', 'azure']):
+                themes.append('Cloud Computing')
+            else:
+                themes.append('Technology Trends')
         
-        # Create a summary based on the themes and site description
-        if themes:
-            unique_themes = list(set(themes))[:3]  # Top 3 unique themes
+        # Create a comprehensive summary
+        unique_themes = list(set(themes))[:3]  # Top 3 unique themes
+        unique_topics = list(set(topics))[:5]  # Top 5 unique topics
+        
+        if unique_themes:
             themes_text = ", ".join(unique_themes)
-            summary = f"Today's top stories focus on {themes_text} within the context of {site_description}. "
+            summary = f"Today's top stories highlight significant developments in {themes_text} within the context of {site_description}. "
         else:
-            summary = f"Today's trending articles highlight important developments related to {site_description}. "
+            summary = f"Today's trending articles showcase important developments related to {site_description}. "
         
-        summary += f"These stories represent the most relevant and engaging content currently circulating in this space, providing valuable insights for anyone interested in staying current with {site_description}."
+        if unique_topics:
+            topics_text = ", ".join([topic.replace('_', ' ').title() for topic in unique_topics])
+            summary += f"Key areas of focus include {topics_text}. "
+        
+        summary += f"These stories represent the most relevant and engaging content currently circulating in this space, providing valuable insights for anyone interested in staying current with {site_description}. The articles demonstrate the dynamic nature of this field and highlight emerging trends that could have significant implications for the industry."
         
         return summary

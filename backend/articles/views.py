@@ -146,26 +146,37 @@ class ArticleViewSet(viewsets.ModelViewSet):
             category = request.query_params.get('category', 'general')
             limit = int(request.query_params.get('limit', 10))
             
+            print(f"Trending topics request - site_slug: {site_slug}, category: {category}, limit: {limit}")
+            
             automation = ContentAutomation()
             
             if site_slug:
                 try:
                     site = Site.objects.get(slug=site_slug)
+                    print(f"Found site: {site.name} with description: {site.description}")
                     topics = automation.get_trending_topics_for_site(site, limit)
+                    print(f"Got {len(topics)} topics for site {site.name}")
                 except Site.DoesNotExist:
+                    print(f"Site with slug '{site_slug}' not found")
                     return Response(
                         {'error': f'Site with slug "{site_slug}" not found'}, 
                         status=status.HTTP_404_NOT_FOUND
                     )
             else:
+                print("No site_slug provided, getting general topics")
                 topics = automation.get_general_trending_topics(category, limit)
+                print(f"Got {len(topics)} general topics")
             
+            print(f"Returning {len(topics)} topics")
             return Response({
                 'topics': topics,
                 'count': len(topics)
             })
             
         except Exception as e:
+            print(f"Error in trending_topics endpoint: {e}")
+            import traceback
+            traceback.print_exc()
             return Response(
                 {'error': f'Error fetching trending topics: {str(e)}'}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -212,5 +223,54 @@ class ArticleViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response(
                 {'error': f'Error creating news summary: {str(e)}'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=False, methods=['post'], permission_classes=[AllowAny])
+    def generate_daily_top3(self, request):
+        """Generate a Daily Top 3 article combining multiple topics"""
+        try:
+            site_slug = request.data.get('site_slug')
+            topics = request.data.get('topics', [])
+            
+            if not site_slug:
+                return Response(
+                    {'error': 'site_slug is required'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            if not topics or len(topics) < 3:
+                return Response(
+                    {'error': 'At least 3 topics are required for Daily Top 3'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            try:
+                site = Site.objects.get(slug=site_slug)
+            except Site.DoesNotExist:
+                return Response(
+                    {'error': f'Site with slug "{site_slug}" not found'}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            automation = ContentAutomation()
+            
+            # Generate Daily Top 3 article using the provided topics
+            article = automation.generate_daily_top3_from_topics(site, topics[:3])
+            
+            if article:
+                return Response({
+                    'message': f'Generated Daily Top 3 article: {article.title}',
+                    'article_id': article.pk
+                })
+            else:
+                return Response(
+                    {'error': 'Failed to generate Daily Top 3 article'}, 
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+                
+        except Exception as e:
+            return Response(
+                {'error': f'Error generating Daily Top 3: {str(e)}'}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )

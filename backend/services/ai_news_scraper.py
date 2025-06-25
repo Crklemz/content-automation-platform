@@ -71,6 +71,20 @@ class AINewsScraper:
                 'https://feeds.feedburner.com/venturebeat/business',
                 'https://www.inc.com/rss.xml'
             ],
+            'sustainability': [
+                'https://feeds.feedburner.com/TreeHugger',
+                'https://www.greenbiz.com/rss.xml',
+                'https://www.ecowatch.com/rss.xml',
+                'https://www.sustainablebrands.com/rss.xml',
+                'https://www.environmentalleader.com/feed/'
+            ],
+            'green_living': [
+                'https://feeds.feedburner.com/TreeHugger',
+                'https://www.greenbiz.com/rss.xml',
+                'https://www.ecowatch.com/rss.xml',
+                'https://www.sustainablebrands.com/rss.xml',
+                'https://www.environmentalleader.com/feed/'
+            ],
             'general': [
                 'https://feeds.feedburner.com/TechCrunch/',
                 'https://www.wired.com/feed/rss',
@@ -97,7 +111,16 @@ class AINewsScraper:
             'business': ['business', 'startup', 'entrepreneur', 'funding', 'investment', 'market', 'revenue'],
             'cybersecurity': ['security', 'cybersecurity', 'hacking', 'privacy', 'encryption', 'breach'],
             'cloud': ['cloud', 'AWS', 'Azure', 'Google Cloud', 'infrastructure', 'SaaS'],
-            'mobile': ['mobile', 'iOS', 'Android', 'app', 'smartphone', 'tablet']
+            'mobile': ['mobile', 'iOS', 'Android', 'app', 'smartphone', 'tablet'],
+            'sustainability': ['sustainable', 'sustainability', 'green', 'environment', 'climate', 'eco-friendly', 'renewable', 'carbon'],
+            'green_living': ['sustainable', 'green', 'environment', 'climate', 'eco-friendly', 'renewable', 'carbon', 'living', 'lifestyle', 'organic']
+        }
+        
+        # Site-specific keyword mappings
+        self.site_keywords = {
+            'sustainable living made simple': ['sustainable', 'green', 'environment', 'climate', 'eco-friendly', 'renewable', 'carbon', 'living', 'lifestyle', 'organic', 'zero waste', 'minimalism'],
+            'ai insights daily': ['artificial intelligence', 'machine learning', 'deep learning', 'neural networks', 'AI', 'ML', 'GPT', 'LLM', 'automation', 'data science'],
+            'tech startup insights': ['startup', 'entrepreneur', 'business', 'funding', 'investment', 'innovation', 'technology', 'venture capital', 'growth']
         }
     
     def get_trending_topics(self, category: str = "general", limit: int = 10) -> List[Dict]:
@@ -167,19 +190,47 @@ class AINewsScraper:
             List of relevant topics with AI analysis
         """
         try:
-            # Use a simple search approach - get articles from multiple sources
+            print(f"Getting site-specific topics for: {site_description}, limit: {limit}")
+            
+            # Determine which RSS feeds to use based on site description
+            site_desc_lower = site_description.lower()
+            
+            if any(keyword in site_desc_lower for keyword in ['sustainable', 'green', 'environment', 'climate']):
+                # Use sustainability/green living feeds
+                target_feeds = self.rss_feeds.get('sustainability', []) + self.rss_feeds.get('green_living', [])
+                category = 'sustainability'
+                print(f"Using sustainability feeds: {len(target_feeds)} feeds")
+            elif any(keyword in site_desc_lower for keyword in ['ai', 'artificial intelligence', 'machine learning']):
+                # Use AI/tech feeds
+                target_feeds = self.rss_feeds.get('ai', []) + self.rss_feeds.get('tech', [])
+                category = 'ai'
+                print(f"Using AI feeds: {len(target_feeds)} feeds")
+            elif any(keyword in site_desc_lower for keyword in ['startup', 'business', 'entrepreneur']):
+                # Use business feeds
+                target_feeds = self.rss_feeds.get('business', []) + self.rss_feeds.get('tech', [])
+                category = 'business'
+                print(f"Using business feeds: {len(target_feeds)} feeds")
+            else:
+                # Use general feeds
+                target_feeds = self.rss_feeds.get('general', [])
+                category = 'general'
+                print(f"Using general feeds: {len(target_feeds)} feeds")
+            
             all_articles = []
             
-            # Fetch from multiple RSS feeds to get variety
-            for category, feeds in self.rss_feeds.items():
-                for feed_url in feeds[:2]:  # Limit to 2 feeds per category
-                    try:
-                        articles = self._fetch_rss_feed(feed_url, category)
-                        all_articles.extend(articles)
-                        time.sleep(0.5)  # Be respectful to servers
-                    except Exception as e:
-                        print(f"Error fetching from {feed_url}: {e}")
-                        continue
+            # Fetch from selected RSS feeds
+            for feed_url in target_feeds[:4]:  # Limit to 4 feeds to avoid rate limiting
+                try:
+                    print(f"Fetching from feed: {feed_url}")
+                    articles = self._fetch_rss_feed(feed_url, category)
+                    print(f"Got {len(articles)} articles from {feed_url}")
+                    all_articles.extend(articles)
+                    time.sleep(0.5)  # Be respectful to servers
+                except Exception as e:
+                    print(f"Error fetching from {feed_url}: {e}")
+                    continue
+            
+            print(f"Total articles fetched: {len(all_articles)}")
             
             # Enhanced processing with AI analysis
             enhanced_articles = []
@@ -192,28 +243,51 @@ class AINewsScraper:
                     print(f"Error enhancing article {article.get('title', 'Unknown')}: {e}")
                     continue
             
+            print(f"Enhanced articles: {len(enhanced_articles)}")
+            
             # Remove duplicates
             unique_articles = self._remove_duplicates_semantic(enhanced_articles)
+            print(f"Unique articles: {len(unique_articles)}")
             
             # Calculate relevance to site description
             relevant_articles = []
             for article in unique_articles:
                 relevance_score = self._calculate_relevance(article, site_description)
                 article['relevance_score'] = relevance_score
-                relevant_articles.append(article)
+                
+                # Use stricter threshold for sustainability content
+                if 'sustainable' in site_description.lower() or 'green' in site_description.lower():
+                    # Higher threshold for sustainability content
+                    if relevance_score > 0.3:
+                        relevant_articles.append(article)
+                else:
+                    # Lower threshold for other content
+                    if relevance_score > 0.1:
+                        relevant_articles.append(article)
             
-            # Sort by relevance and quality, return top results
+            print(f"Relevant articles: {len(relevant_articles)}")
+            
+            # Sort by relevance score and quality score
             sorted_articles = sorted(
                 relevant_articles, 
                 key=lambda x: (x.get('relevance_score', 0), x.get('quality_score', 0)), 
                 reverse=True
             )
             
-            return sorted_articles[:limit]
+            # If we don't have enough relevant articles, include some general ones
+            if len(sorted_articles) < limit:
+                remaining_articles = [a for a in unique_articles if a not in sorted_articles]
+                sorted_articles.extend(remaining_articles[:limit - len(sorted_articles)])
+                print(f"Added {limit - len(sorted_articles)} general articles")
+            
+            result = sorted_articles[:limit]
+            print(f"Returning {len(result)} topics")
+            return result
             
         except Exception as e:
             print(f"Error fetching site-specific topics: {e}")
-            return []
+            print(f"Falling back to mock topics for category: {category}")
+            return self._get_mock_topics(category, limit)
     
     def get_article_summary(self, url: str) -> Optional[Dict]:
         """
@@ -339,46 +413,89 @@ class AINewsScraper:
     
     def _enhance_article_with_ai(self, article: Dict) -> Dict:
         """Enhance article with AI analysis"""
-        content = article.get('content', '') or article.get('description', '')
-        title = article.get('title', '')
-        
-        # Extract keywords
-        keywords = self._extract_keywords(content, title)
-        
-        # Analyze sentiment
-        sentiment = self._analyze_sentiment(content)
-        
-        # Calculate quality score
-        quality_score = self._calculate_quality_score(article)
-        
-        # Extract topics
-        topics = self._extract_topics(content, title)
-        
-        # Extract entities
-        entities = self._extract_entities(content)
-        
-        # Calculate reading time
-        word_count = len(content.split())
-        reading_time = max(1, word_count // 200)  # Average reading speed
-        
-        # Create hash for deduplication
-        hash_id = self._create_article_hash(article)
-        
-        # Create AI summary if not present
-        if not article.get('summary'):
-            article['summary'] = self._create_ai_summary(content)
-        
-        return {
-            **article,
-            'keywords': keywords,
-            'sentiment': sentiment,
-            'quality_score': quality_score,
-            'word_count': word_count,
-            'reading_time': reading_time,
-            'topics': topics,
-            'entities': entities,
-            'hash_id': hash_id
-        }
+        try:
+            # Extract content from URL if available
+            content = article.get('content', '')
+            if not content and article.get('url'):
+                try:
+                    url = article.get('url')
+                    if url and isinstance(url, str):
+                        extracted_content = self.get_article_summary(url)
+                        if extracted_content:
+                            content = extracted_content.get('content', '')
+                except Exception as e:
+                    print(f"Error extracting content from {article.get('url')}: {e}")
+            
+            # Use description as fallback content
+            if not content:
+                content = article.get('description', '')
+            
+            # Extract keywords
+            keywords = self._extract_keywords(content, article.get('title', ''))
+            
+            # Analyze sentiment
+            sentiment = self._analyze_sentiment(content)
+            
+            # Calculate quality score
+            quality_score = self._calculate_quality_score(article)
+            
+            # Extract topics
+            topics = self._extract_topics(content, article.get('title', ''))
+            
+            # Extract entities
+            entities = self._extract_entities(content)
+            
+            # Create AI summary
+            ai_summary = self._create_ai_summary(content)
+            
+            # Create hash for deduplication
+            hash_id = self._create_article_hash(article)
+            
+            # Return enhanced article
+            enhanced = {
+                'title': article.get('title', ''),
+                'description': article.get('description', ''),
+                'content': content,
+                'summary': ai_summary,
+                'url': article.get('url', ''),
+                'source': article.get('source', 'Unknown'),
+                'category': article.get('category', 'General'),
+                'published': article.get('published', ''),
+                'keywords': keywords,
+                'sentiment': sentiment,
+                'quality_score': quality_score,
+                'word_count': len(content.split()),
+                'reading_time': max(1, len(content.split()) // 200),  # 200 words per minute
+                'language': 'en',
+                'topics': topics,
+                'entities': entities,
+                'hash_id': hash_id
+            }
+            
+            return enhanced
+            
+        except Exception as e:
+            print(f"Error enhancing article: {e}")
+            # Return basic article with minimal enhancement
+            return {
+                'title': article.get('title', ''),
+                'description': article.get('description', ''),
+                'content': article.get('description', ''),
+                'summary': article.get('description', ''),
+                'url': article.get('url', ''),
+                'source': article.get('source', 'Unknown'),
+                'category': article.get('category', 'General'),
+                'published': article.get('published', ''),
+                'keywords': [],
+                'sentiment': 'neutral',
+                'quality_score': 0.5,
+                'word_count': len(article.get('description', '').split()),
+                'reading_time': 1,
+                'language': 'en',
+                'topics': [],
+                'entities': [],
+                'hash_id': self._create_article_hash(article)
+            }
     
     def _extract_keywords(self, content: str, title: str) -> List[str]:
         """Extract keywords from content using TF-IDF approach"""
@@ -513,17 +630,66 @@ class AINewsScraper:
         article_text = article_text.lower()
         site_desc = site_description.lower()
         
-        # Count common words
+        # Get site-specific keywords
+        site_keywords = self.site_keywords.get(site_description.lower(), [])
+        
+        # Calculate relevance using multiple methods
+        relevance_scores = []
+        
+        # Method 1: Direct keyword matching
+        if site_keywords:
+            keyword_matches = sum(1 for keyword in site_keywords if keyword in article_text)
+            keyword_score = keyword_matches / len(site_keywords)
+            relevance_scores.append(keyword_score * 2)  # Weight keyword matching higher
+        
+        # Method 2: Common word matching
         article_words = set(re.findall(r'\b\w+\b', article_text))
         site_words = set(re.findall(r'\b\w+\b', site_desc))
         
-        if not site_words:
-            return 0.0
+        if site_words:
+            common_words = article_words.intersection(site_words)
+            word_score = len(common_words) / len(site_words)
+            relevance_scores.append(word_score)
         
-        common_words = article_words.intersection(site_words)
-        relevance = len(common_words) / len(site_words)
+        # Method 3: Topic category matching
+        article_topics = article.get('topics', [])
+        if article_topics:
+            # Check if any article topics match site keywords
+            topic_matches = sum(1 for topic in article_topics if any(keyword in topic for keyword in site_keywords))
+            topic_score = topic_matches / len(article_topics) if article_topics else 0
+            relevance_scores.append(topic_score)
         
-        return min(1.0, relevance)
+        # Method 4: Semantic similarity for specific site descriptions
+        if 'sustainable' in site_desc or 'green' in site_desc:
+            # Boost relevance for sustainability-related content
+            sustainability_keywords = ['sustainable', 'green', 'environment', 'climate', 'eco', 'renewable', 'carbon', 'zero waste', 'organic', 'natural']
+            sustainability_matches = sum(1 for keyword in sustainability_keywords if keyword in article_text)
+            if sustainability_matches > 0:
+                relevance_scores.append(0.9)  # Very high relevance for sustainability content
+            else:
+                # Penalize non-sustainability content for green living sites
+                relevance_scores.append(0.1)  # Low relevance for non-sustainability content
+        
+        if 'ai' in site_desc or 'artificial intelligence' in site_desc:
+            # Boost relevance for AI-related content
+            ai_keywords = ['artificial intelligence', 'machine learning', 'deep learning', 'neural networks', 'AI', 'ML', 'GPT']
+            ai_matches = sum(1 for keyword in ai_keywords if keyword in article_text)
+            if ai_matches > 0:
+                relevance_scores.append(0.8)  # High relevance for AI content
+        
+        if 'startup' in site_desc or 'business' in site_desc:
+            # Boost relevance for business/startup content
+            business_keywords = ['startup', 'business', 'entrepreneur', 'funding', 'investment', 'venture']
+            business_matches = sum(1 for keyword in business_keywords if keyword in article_text)
+            if business_matches > 0:
+                relevance_scores.append(0.8)  # High relevance for business content
+        
+        # Calculate final relevance score
+        if relevance_scores:
+            final_score = sum(relevance_scores) / len(relevance_scores)
+            return min(1.0, final_score)
+        
+        return 0.0
     
     def _remove_duplicates_semantic(self, articles: List[Dict]) -> List[Dict]:
         """Remove duplicates using semantic similarity"""
@@ -621,6 +787,32 @@ class AINewsScraper:
                     'quality_score': 0.8,
                     'topics': ['ai', 'healthcare'],
                     'entities': ['AI', 'Healthcare']
+                },
+                {
+                    'title': 'Machine Learning in Finance',
+                    'description': 'AI-powered trading algorithms and risk assessment',
+                    'category': 'AI & Finance',
+                    'source': 'Tech News',
+                    'url': 'https://example.com/ai-finance',
+                    'published': datetime.now().isoformat(),
+                    'keywords': ['AI', 'finance', 'trading', 'algorithms'],
+                    'sentiment': 'positive',
+                    'quality_score': 0.7,
+                    'topics': ['ai', 'finance'],
+                    'entities': ['AI', 'Finance']
+                },
+                {
+                    'title': 'GPT-4 Applications in Business',
+                    'description': 'How businesses are leveraging GPT-4 for productivity',
+                    'category': 'AI & Business',
+                    'source': 'Business Tech',
+                    'url': 'https://example.com/gpt4-business',
+                    'published': datetime.now().isoformat(),
+                    'keywords': ['GPT-4', 'business', 'productivity', 'AI'],
+                    'sentiment': 'positive',
+                    'quality_score': 0.9,
+                    'topics': ['ai', 'business'],
+                    'entities': ['GPT-4', 'Business']
                 }
             ],
             'tech': [
@@ -636,8 +828,159 @@ class AINewsScraper:
                     'quality_score': 0.7,
                     'topics': ['tech', 'cloud'],
                     'entities': ['Cloud', 'AWS', 'Azure']
+                },
+                {
+                    'title': 'Cybersecurity Best Practices',
+                    'description': 'Essential security measures for modern businesses',
+                    'category': 'Cybersecurity',
+                    'source': 'Security Weekly',
+                    'url': 'https://example.com/cybersecurity',
+                    'published': datetime.now().isoformat(),
+                    'keywords': ['cybersecurity', 'security', 'business', 'protection'],
+                    'sentiment': 'neutral',
+                    'quality_score': 0.8,
+                    'topics': ['tech', 'security'],
+                    'entities': ['Cybersecurity', 'Business']
+                },
+                {
+                    'title': 'Mobile App Development Trends',
+                    'description': 'Latest innovations in mobile application development',
+                    'category': 'Mobile Development',
+                    'source': 'Mobile Tech',
+                    'url': 'https://example.com/mobile-trends',
+                    'published': datetime.now().isoformat(),
+                    'keywords': ['mobile', 'app', 'development', 'innovation'],
+                    'sentiment': 'positive',
+                    'quality_score': 0.6,
+                    'topics': ['tech', 'mobile'],
+                    'entities': ['Mobile', 'Apps']
+                }
+            ],
+            'sustainability': [
+                {
+                    'title': 'Sustainable Energy Solutions',
+                    'description': 'Innovative renewable energy technologies for a greener future',
+                    'category': 'Renewable Energy',
+                    'source': 'Green Tech',
+                    'url': 'https://example.com/sustainable-energy',
+                    'published': datetime.now().isoformat(),
+                    'keywords': ['sustainable', 'energy', 'renewable', 'green'],
+                    'sentiment': 'positive',
+                    'quality_score': 0.8,
+                    'topics': ['sustainability', 'energy'],
+                    'entities': ['Renewable Energy', 'Green Tech']
+                },
+                {
+                    'title': 'Zero Waste Living Tips',
+                    'description': 'Practical strategies for reducing household waste',
+                    'category': 'Green Living',
+                    'source': 'Eco Living',
+                    'url': 'https://example.com/zero-waste',
+                    'published': datetime.now().isoformat(),
+                    'keywords': ['zero waste', 'living', 'sustainable', 'household'],
+                    'sentiment': 'positive',
+                    'quality_score': 0.7,
+                    'topics': ['sustainability', 'lifestyle'],
+                    'entities': ['Zero Waste', 'Eco Living']
+                },
+                {
+                    'title': 'Climate Change Solutions',
+                    'description': 'Innovative approaches to addressing climate challenges',
+                    'category': 'Climate Action',
+                    'source': 'Climate News',
+                    'url': 'https://example.com/climate-solutions',
+                    'published': datetime.now().isoformat(),
+                    'keywords': ['climate', 'change', 'solutions', 'environment'],
+                    'sentiment': 'neutral',
+                    'quality_score': 0.9,
+                    'topics': ['sustainability', 'climate'],
+                    'entities': ['Climate Change', 'Environment']
+                }
+            ],
+            'business': [
+                {
+                    'title': 'Startup Funding Trends',
+                    'description': 'Latest developments in venture capital and startup financing',
+                    'category': 'Venture Capital',
+                    'source': 'Startup News',
+                    'url': 'https://example.com/startup-funding',
+                    'published': datetime.now().isoformat(),
+                    'keywords': ['startup', 'funding', 'venture', 'capital'],
+                    'sentiment': 'positive',
+                    'quality_score': 0.8,
+                    'topics': ['business', 'startup'],
+                    'entities': ['Startup', 'Venture Capital']
+                },
+                {
+                    'title': 'Digital Transformation Strategies',
+                    'description': 'How businesses are adapting to the digital age',
+                    'category': 'Business Strategy',
+                    'source': 'Business Weekly',
+                    'url': 'https://example.com/digital-transformation',
+                    'published': datetime.now().isoformat(),
+                    'keywords': ['digital', 'transformation', 'business', 'strategy'],
+                    'sentiment': 'positive',
+                    'quality_score': 0.7,
+                    'topics': ['business', 'technology'],
+                    'entities': ['Digital', 'Business']
+                },
+                {
+                    'title': 'Remote Work Best Practices',
+                    'description': 'Effective strategies for managing remote teams',
+                    'category': 'Workplace',
+                    'source': 'HR Today',
+                    'url': 'https://example.com/remote-work',
+                    'published': datetime.now().isoformat(),
+                    'keywords': ['remote', 'work', 'teams', 'management'],
+                    'sentiment': 'positive',
+                    'quality_score': 0.6,
+                    'topics': ['business', 'workplace'],
+                    'entities': ['Remote Work', 'Management']
+                }
+            ],
+            'general': [
+                {
+                    'title': 'Technology Innovation Trends',
+                    'description': 'Latest breakthroughs in technology and innovation',
+                    'category': 'Innovation',
+                    'source': 'Tech Trends',
+                    'url': 'https://example.com/innovation-trends',
+                    'published': datetime.now().isoformat(),
+                    'keywords': ['technology', 'innovation', 'trends', 'breakthroughs'],
+                    'sentiment': 'positive',
+                    'quality_score': 0.8,
+                    'topics': ['tech', 'innovation'],
+                    'entities': ['Technology', 'Innovation']
+                },
+                {
+                    'title': 'Digital Privacy Concerns',
+                    'description': 'Growing concerns about data privacy and protection',
+                    'category': 'Privacy',
+                    'source': 'Privacy Watch',
+                    'url': 'https://example.com/privacy-concerns',
+                    'published': datetime.now().isoformat(),
+                    'keywords': ['privacy', 'data', 'protection', 'digital'],
+                    'sentiment': 'neutral',
+                    'quality_score': 0.7,
+                    'topics': ['tech', 'privacy'],
+                    'entities': ['Privacy', 'Data Protection']
+                },
+                {
+                    'title': 'Future of Work',
+                    'description': 'How automation and AI are reshaping employment',
+                    'category': 'Workplace',
+                    'source': 'Future Work',
+                    'url': 'https://example.com/future-work',
+                    'published': datetime.now().isoformat(),
+                    'keywords': ['future', 'work', 'automation', 'AI'],
+                    'sentiment': 'neutral',
+                    'quality_score': 0.6,
+                    'topics': ['workplace', 'automation'],
+                    'entities': ['Future', 'Work', 'AI']
                 }
             ]
         }
         
-        return mock_topics.get(category, mock_topics['tech'])[:limit] 
+        # Return mock topics for the requested category, or fallback to general
+        category_topics = mock_topics.get(category, mock_topics['general'])
+        return category_topics[:limit] 
