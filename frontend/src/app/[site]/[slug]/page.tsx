@@ -98,18 +98,24 @@ export default async function ArticlePage(props: {
             Sources & References
           </h2>
           <ul className="space-y-2">
-            {article.sources.map((src, i) => (
-              <li key={i} className="text-sm">
-                <a 
-                  href={src} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:text-blue-800 hover:underline break-all"
-                >
-                  {src}
-                </a>
-              </li>
-            ))}
+            {article.sources.map((src, i) => {
+              // Handle both string and object formats
+              const url = typeof src === 'string' ? src : src.url;
+              const title = typeof src === 'string' ? src : (src.title || src.source);
+              
+              return (
+                <li key={i} className="text-sm">
+                  <a 
+                    href={url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:text-blue-800 hover:underline break-all"
+                  >
+                    {title}
+                  </a>
+                </li>
+              );
+            })}
           </ul>
         </section>
       )}

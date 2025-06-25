@@ -4,7 +4,11 @@ export interface Article {
   slug: string;
   body: string;
   site: string;
-  sources?: string[];
+  sources?: Array<{
+    url: string;
+    title: string;
+    source: string;
+  }> | string[];
   status: string;
   created_at: string;
 }
