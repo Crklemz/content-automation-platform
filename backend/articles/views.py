@@ -170,3 +170,47 @@ class ArticleViewSet(viewsets.ModelViewSet):
                 {'error': f'Error fetching trending topics: {str(e)}'}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+    @action(detail=False, methods=['get'], permission_classes=[AllowAny])
+    def news_summary(self, request):
+        """Get news summary for a specific topic with sources"""
+        try:
+            topic = request.query_params.get('topic')
+            site_slug = request.query_params.get('site_slug')
+            
+            if not topic:
+                return Response(
+                    {'error': 'topic parameter is required'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            automation = ContentAutomation()
+            
+            if site_slug:
+                try:
+                    site = Site.objects.get(slug=site_slug)
+                    sources = automation._get_relevant_sources(topic, site)
+                except Site.DoesNotExist:
+                    return Response(
+                        {'error': f'Site with slug "{site_slug}" not found'}, 
+                        status=status.HTTP_404_NOT_FOUND
+                    )
+            else:
+                # Get general sources if no site specified
+                sources = automation.news_scraper.get_trending_topics('general', limit=5)
+            
+            # Create a summary of the topic based on sources
+            summary = automation._create_topic_summary(topic, sources)
+            
+            return Response({
+                'topic': topic,
+                'summary': summary,
+                'sources': sources,
+                'count': len(sources)
+            })
+            
+        except Exception as e:
+            return Response(
+                {'error': f'Error creating news summary: {str(e)}'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
