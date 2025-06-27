@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Article } from '@/types';
 import { Site } from '@/types/admin';
+import { createHeaders } from '@/lib/auth';
 
 interface ArticleTableProps {
   articles: Article[];
@@ -58,7 +59,7 @@ export default function ArticleTable({ articles, sites }: ArticleTableProps) {
     try {
       const response = await fetch(`http://localhost:8000/api/articles/${articleId}/${status}/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: createHeaders(),
         credentials: 'include'
       });
 
@@ -88,7 +89,7 @@ export default function ArticleTable({ articles, sites }: ArticleTableProps) {
       const promises = Array.from(selectedArticles).map(articleId =>
         fetch(`http://localhost:8000/api/articles/${articleId}/${status}/`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: createHeaders(),
           credentials: 'include'
         })
       );
@@ -201,24 +202,41 @@ export default function ArticleTable({ articles, sites }: ArticleTableProps) {
                   {new Date(article.created_at).toLocaleDateString()}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  {article.status === 'pending' && (
-                    <>
-                      <button
-                        onClick={() => updateArticleStatus(article.id, 'approve')}
-                        disabled={loading.has(article.id)}
-                        className="text-green-600 hover:text-green-900 disabled:opacity-50"
-                      >
-                        Approve
-                      </button>
-                      <button
-                        onClick={() => updateArticleStatus(article.id, 'reject')}
-                        disabled={loading.has(article.id)}
-                        className="text-red-600 hover:text-red-900 disabled:opacity-50 ml-4"
-                      >
-                        Reject
-                      </button>
-                    </>
-                  )}
+                  <div className="flex items-center space-x-2">
+                    {/* View button for all articles */}
+                    <a
+                      href={`/${article.site}/${article.slug}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:text-blue-900"
+                    >
+                      View
+                    </a>
+                    
+                    {/* Approve/Reject buttons for all articles */}
+                    <button
+                      onClick={() => updateArticleStatus(article.id, 'approve')}
+                      disabled={loading.has(article.id) || article.status === 'approved'}
+                      className={`${
+                        article.status === 'approved' 
+                          ? 'text-green-800 bg-green-100 px-2 py-1 rounded text-xs' 
+                          : 'text-green-600 hover:text-green-900'
+                      } disabled:opacity-50`}
+                    >
+                      {article.status === 'approved' ? 'Approved' : 'Approve'}
+                    </button>
+                    <button
+                      onClick={() => updateArticleStatus(article.id, 'reject')}
+                      disabled={loading.has(article.id) || article.status === 'rejected'}
+                      className={`${
+                        article.status === 'rejected' 
+                          ? 'text-red-800 bg-red-100 px-2 py-1 rounded text-xs' 
+                          : 'text-red-600 hover:text-red-900'
+                      } disabled:opacity-50`}
+                    >
+                      {article.status === 'rejected' ? 'Rejected' : 'Reject'}
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
