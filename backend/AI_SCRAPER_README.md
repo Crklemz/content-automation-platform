@@ -36,10 +36,8 @@ The AI-powered news scraper (`AINewsScraper`) is an advanced content extraction 
 
 ### 1. Install AI Scraping Dependencies
 
-```bash
 cd backend
 pip install -r requirements_ai_scraping.txt
-```
 
 ### 2. Optional: Install Advanced NLP (for even better results)
 
@@ -71,21 +69,29 @@ site_topics = scraper.get_site_specific_topics(
 summary = scraper.get_article_summary("https://example.com/article")
 ```
 
-### Django Management Command
+### Django Management Commands
 
 ```bash
-# Test the AI scraper
+# Test the AI scraper with different categories
 python manage.py test_ai_scraper --category ai --limit 5
 
-# Compare with traditional scraper
-python manage.py test_ai_scraper --category tech --limit 3 --compare
+# Test with tech category
+python manage.py test_ai_scraper --category tech --limit 3
+
+# Test with business category
+python manage.py test_ai_scraper --category business --limit 3
 ```
 
-### Standalone Test Script
+### Python Test Scripts
 
 ```bash
 cd backend
-python test_ai_scraper.py
+
+# Run the test script in the tests directory
+python tests/test_ai_scraper.py
+
+# Or run the management command version
+python manage.py test_ai_scraper
 ```
 
 ## Comparison: Traditional vs AI Scraper
@@ -198,6 +204,32 @@ Consider implementing caching for:
 - Article summaries (cache for 1 hour)
 - Quality scores (cache for 24 hours)
 
+## Testing
+
+### Available Test Commands
+
+```bash
+# Test AI scraper functionality
+python manage.py test_ai_scraper --category ai --limit 5
+
+# Test with different categories
+python manage.py test_ai_scraper --category tech --limit 3
+python manage.py test_ai_scraper --category business --limit 3
+
+# Run the standalone test script
+python tests/test_ai_scraper.py
+```
+
+### Test Output
+
+The test commands provide detailed output including:
+- Article titles and sources
+- Quality scores and sentiment analysis
+- Keywords and topics
+- Reading time and word count
+- Enhanced summaries
+- Site-specific relevance scoring
+
 ## Error Handling
 
 The scraper includes robust error handling:
@@ -254,16 +286,6 @@ The scraper includes robust error handling:
    - Reduce batch sizes
    - Clear caches regularly
    - Use streaming processing
-
-## Contributing
-
-To enhance the AI scraper:
-
-1. **Add new extraction methods** in `_extract_*` methods
-2. **Improve quality scoring** in `_calculate_quality_score`
-3. **Enhance sentiment analysis** in `_analyze_sentiment`
-4. **Add new topic keywords** in `topic_keywords`
-5. **Implement caching** for better performance
 
 ## License
 

@@ -146,13 +146,7 @@ The system recognizes these domains as credible sources:
 
 ## Testing
 
-### Standalone Test
-```bash
-cd backend
-python test_plagiarism_prevention.py
-```
-
-### Django Management Command
+### Django Management Commands
 ```bash
 # Basic functionality test
 python manage.py test_plagiarism_prevention --test-type basic
@@ -162,6 +156,17 @@ python manage.py test_plagiarism_prevention --test-type ai-sources
 
 # Full test suite
 python manage.py test_plagiarism_prevention --test-type full
+```
+
+### Python Test Scripts
+```bash
+cd backend
+
+# Run the test script in the tests directory
+python tests/test_plagiarism_prevention.py
+
+# Or run the management command version
+python manage.py test_plagiarism_prevention
 ```
 
 ## Configuration
@@ -199,30 +204,20 @@ checker.suspicious_patterns.append(r'\byour_pattern\b')
 - Follow recommendations
 
 ### 3. **Quality Assurance**
-- Validate source quality before generation
-- Review suspicious sections manually
-- Ensure proper attribution
-- Monitor confidence scores
+- Monitor overall quality scores
+- Ensure diverse source domains
+- Validate source recency
+- Review attribution sections
 
-### 4. **Ethical Guidelines**
-- Never copy text directly from sources
-- Use sources for facts and insights only
-- Write in your own unique voice
-- Always provide proper attribution
-- Respect intellectual property rights
+## Test Output
 
-## Error Handling
-
-The system includes robust error handling:
-
-```python
-try:
-    analysis = checker.analyze_content_for_plagiarism(content, sources)
-except Exception as e:
-    # Fallback to manual review
-    print(f"Analysis failed: {e}")
-    # Flag for manual review
-```
+The test commands provide detailed output including:
+- Plagiarism analysis results
+- Source quality validation
+- Content enhancement verification
+- Confidence scores and recommendations
+- Attribution section generation
+- Real-world source testing with AI scraper
 
 ## Performance Considerations
 
