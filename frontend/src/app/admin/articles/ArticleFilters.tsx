@@ -1,6 +1,5 @@
 'use client';
 
-import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { Site } from '@/types/admin';
 
@@ -11,42 +10,20 @@ interface ArticleFiltersProps {
     status: string;
     search: string;
   };
+  onFilterChange: (filters: { site: string; status: string; search: string }) => void;
 }
 
-export default function ArticleFilters({ sites, currentFilters }: ArticleFiltersProps) {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  
+export default function ArticleFilters({ sites, currentFilters, onFilterChange }: ArticleFiltersProps) {
   const [filters, setFilters] = useState({
     site: currentFilters.site,
     status: currentFilters.status,
     search: currentFilters.search,
   });
 
-  // Update URL when filters change
+  // Update parent component when filters change
   useEffect(() => {
-    const params = new URLSearchParams(searchParams);
-    
-    if (filters.site) {
-      params.set('site', filters.site);
-    } else {
-      params.delete('site');
-    }
-    
-    if (filters.status) {
-      params.set('status', filters.status);
-    } else {
-      params.delete('status');
-    }
-    
-    if (filters.search) {
-      params.set('search', filters.search);
-    } else {
-      params.delete('search');
-    }
-    
-    router.push(`/admin/articles?${params.toString()}`);
-  }, [filters, router, searchParams]);
+    onFilterChange(filters);
+  }, [filters, onFilterChange]);
 
   const clearFilters = () => {
     setFilters({ site: '', status: '', search: '' });
