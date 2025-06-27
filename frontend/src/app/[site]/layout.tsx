@@ -1,14 +1,45 @@
+import { Site } from "@/types";
 import { getSiteConfig } from "@/lib/getSiteConfig";
 import { notFound } from "next/navigation";
+import SiteNavigation from "./SiteNavigation";
 
 interface SiteLayoutProps {
   children: React.ReactNode;
   params: Promise<{ site: string }>;
 }
 
+async function getSites(): Promise<Site[]> {
+  try {
+    const res = await fetch('http://localhost:8000/api/sites/', {
+      cache: "no-store",
+    });
+
+    if (!res.ok) {
+      return [];
+    }
+
+    const response = await res.json();
+    
+    if (response && response.results && Array.isArray(response.results)) {
+      return response.results;
+    }
+    
+    if (Array.isArray(response)) {
+      return response;
+    }
+    
+    return [];
+  } catch (error) {
+    return [];
+  }
+}
+
 export default async function SiteLayout({ children, params }: SiteLayoutProps) {
   const { site } = await params;
-  const siteConfig = await getSiteConfig(site);
+  const [siteConfig, allSites] = await Promise.all([
+    getSiteConfig(site),
+    getSites()
+  ]);
   
   if (!siteConfig) {
     notFound();
@@ -21,7 +52,13 @@ export default async function SiteLayout({ children, params }: SiteLayoutProps) 
   } as React.CSSProperties;
 
   return (
-    <div className="min-h-screen" style={siteStyles}>
+    <div className="min-h-screen bg-gray-50">
+      {/* Site Navigation */}
+      <SiteNavigation 
+        currentSite={siteConfig}
+        allSites={allSites}
+      />
+      
       {/* Site Header */}
       <header 
         className="bg-white shadow-sm border-b"
