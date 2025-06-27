@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import ProtectedRoute from '../ProtectedRoute';
 import { Article } from "@/types";
 import { Site, ArticleFilters } from "@/types/admin";
@@ -8,11 +9,12 @@ import ArticleTable from "@/app/admin/articles/ArticleTable";
 import ArticleFiltersComponent from "@/app/admin/articles/ArticleFilters";
 
 export default function ArticlesPage() {
+  const searchParams = useSearchParams();
   const [articles, setArticles] = useState<Article[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
   const [filters, setFilters] = useState<ArticleFilters>({
     site: '',
-    status: '',
+    status: searchParams.get('status') || '',
     search: '',
   });
   const [isLoading, setIsLoading] = useState(true);
