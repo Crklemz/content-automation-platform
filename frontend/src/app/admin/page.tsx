@@ -12,26 +12,37 @@ interface DashboardStats {
 async function getDashboardStats(): Promise<DashboardStats> {
   try {
     // Fetch articles with different statuses
-    const [allArticles, pendingArticles, approvedArticles, rejectedArticles, sites] = await Promise.all([
-      fetch("http://localhost:8000/api/articles/", { cache: "no-store" }),
-      fetch("http://localhost:8000/api/articles/?status=pending", { cache: "no-store" }),
-      fetch("http://localhost:8000/api/articles/?status=approved", { cache: "no-store" }),
-      fetch("http://localhost:8000/api/articles/?status=rejected", { cache: "no-store" }),
-      fetch("http://localhost:8000/api/sites/", { cache: "no-store" })
+    const [stats, sites] = await Promise.all([
+      Promise.all([
+        fetch("http://localhost:8000/api/articles/", { 
+          cache: "no-store",
+          credentials: 'include'
+        }),
+        fetch("http://localhost:8000/api/articles/?status=pending", { 
+          cache: "no-store",
+          credentials: 'include'
+        }),
+        fetch("http://localhost:8000/api/articles/?status=approved", { 
+          cache: "no-store",
+          credentials: 'include'
+        }),
+        fetch("http://localhost:8000/api/articles/?status=rejected", { 
+          cache: "no-store",
+          credentials: 'include'
+        }),
+      ]).then(responses => Promise.all(responses.map(r => r.json()))),
+      fetch("http://localhost:8000/api/sites/", { 
+        cache: "no-store",
+        credentials: 'include'
+      }).then(r => r.json())
     ]);
 
-    const allArticlesData = await allArticles.json();
-    const pendingData = await pendingArticles.json();
-    const approvedData = await approvedArticles.json();
-    const rejectedData = await rejectedArticles.json();
-    const sitesData = await sites.json();
-
     return {
-      totalArticles: allArticlesData.count || 0,
-      pendingArticles: pendingData.count || 0,
-      approvedArticles: approvedData.count || 0,
-      rejectedArticles: rejectedData.count || 0,
-      totalSites: sitesData.count || 0,
+      totalArticles: stats[0].count || 0,
+      pendingArticles: stats[1].count || 0,
+      approvedArticles: stats[2].count || 0,
+      rejectedArticles: stats[3].count || 0,
+      totalSites: sites.count || 0,
     };
   } catch (error) {
     console.error('Error fetching dashboard stats:', error);

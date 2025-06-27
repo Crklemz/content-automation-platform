@@ -58,9 +58,8 @@ export default function ArticleTable({ articles, sites }: ArticleTableProps) {
     try {
       const response = await fetch(`http://localhost:8000/api/articles/${articleId}/${status}/`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include'
       });
 
       if (response.ok) {
@@ -84,15 +83,16 @@ export default function ArticleTable({ articles, sites }: ArticleTableProps) {
     if (selectedArticles.size === 0) return;
     
     setLoading(new Set(selectedArticles));
-    
+
     try {
       const promises = Array.from(selectedArticles).map(articleId =>
         fetch(`http://localhost:8000/api/articles/${articleId}/${status}/`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include'
         })
       );
-      
+
       await Promise.all(promises);
       window.location.reload();
     } catch (error) {
@@ -186,7 +186,7 @@ export default function ArticleTable({ articles, sites }: ArticleTableProps) {
                 <td className="px-6 py-4">
                   <div>
                     <div className="text-sm font-medium text-gray-900">{article.title}</div>
-                    <div className="text-sm text-gray-500 truncate max-w-xs">
+                    <div className="text-sm text-gray-500">
                       {article.body.replace(/<[^>]+>/g, "").substring(0, 100)}...
                     </div>
                   </div>
@@ -201,34 +201,24 @@ export default function ArticleTable({ articles, sites }: ArticleTableProps) {
                   {new Date(article.created_at).toLocaleDateString()}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  <div className="flex space-x-2">
-                    {article.status === 'pending' && (
-                      <>
-                        <button
-                          onClick={() => updateArticleStatus(article.id, 'approve')}
-                          disabled={loading.has(article.id)}
-                          className="text-green-600 hover:text-green-900 disabled:opacity-50"
-                        >
-                          Approve
-                        </button>
-                        <button
-                          onClick={() => updateArticleStatus(article.id, 'reject')}
-                          disabled={loading.has(article.id)}
-                          className="text-red-600 hover:text-red-900 disabled:opacity-50"
-                        >
-                          Reject
-                        </button>
-                      </>
-                    )}
-                    <a
-                      href={`/${article.site}/${article.slug}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:text-blue-900"
-                    >
-                      View
-                    </a>
-                  </div>
+                  {article.status === 'pending' && (
+                    <>
+                      <button
+                        onClick={() => updateArticleStatus(article.id, 'approve')}
+                        disabled={loading.has(article.id)}
+                        className="text-green-600 hover:text-green-900 disabled:opacity-50"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => updateArticleStatus(article.id, 'reject')}
+                        disabled={loading.has(article.id)}
+                        className="text-red-600 hover:text-red-900 disabled:opacity-50 ml-4"
+                      >
+                        Reject
+                      </button>
+                    </>
+                  )}
                 </td>
               </tr>
             ))}

@@ -18,6 +18,7 @@ async function getArticles(filters: ArticleFilters): Promise<Article[]> {
     
     const res = await fetch(`http://localhost:8000/api/articles/?${params.toString()}`, {
       cache: "no-store",
+      credentials: 'include'
     });
 
     if (!res.ok) {
@@ -28,17 +29,23 @@ async function getArticles(filters: ArticleFilters): Promise<Article[]> {
     const response = await res.json();
     
     // Handle paginated response format
+    let articles: Article[] = [];
+    let totalCount = 0;
+    
     if (response && response.results && Array.isArray(response.results)) {
-      return response.results;
+      articles = response.results;
+      totalCount = response.count || 0;
+    } else if (Array.isArray(response)) {
+      // Fallback for direct array response
+      articles = response;
+      totalCount = response.length;
+    } else {
+      console.error('Unexpected articles API response format:', response);
+      articles = [];
+      totalCount = 0;
     }
     
-    // Fallback for direct array response
-    if (Array.isArray(response)) {
-      return response;
-    }
-    
-    console.error('Unexpected articles API response format:', response);
-    return [];
+    return articles;
   } catch (error) {
     console.error('Error fetching articles:', error);
     return [];
@@ -47,7 +54,10 @@ async function getArticles(filters: ArticleFilters): Promise<Article[]> {
 
 async function getSites(): Promise<Site[]> {
   try {
-    const res = await fetch("http://localhost:8000/api/sites/", { cache: "no-store" });
+    const res = await fetch("http://localhost:8000/api/sites/", { 
+      cache: "no-store",
+      credentials: 'include'
+    });
     
     if (!res.ok) {
       console.error(`Sites API error: ${res.status} ${res.statusText}`);
@@ -57,16 +67,15 @@ async function getSites(): Promise<Site[]> {
     const response = await res.json();
     
     // Handle paginated response format
+    let sites: Site[] = [];
     if (response && response.results && Array.isArray(response.results)) {
-      return response.results;
+      sites = response.results;
+    } else if (Array.isArray(response)) {
+      // Fallback for direct array response
+      sites = response;
     }
     
-    // Fallback for direct array response
-    if (Array.isArray(response)) {
-      return response;
-    }
-    
-    return [];
+    return sites;
   } catch (error) {
     console.error('Error fetching sites:', error);
     return [];
