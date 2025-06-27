@@ -12,6 +12,39 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Utility function to get CSRF token from cookies
+export function getCSRFToken(): string | null {
+  if (typeof document === 'undefined') return null;
+  
+  const name = 'csrftoken';
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
+
+// Utility function to create headers with CSRF token
+export function createHeaders(contentType: string = 'application/json'): HeadersInit {
+  const headers: HeadersInit = {
+    'Content-Type': contentType,
+  };
+  
+  const csrfToken = getCSRFToken();
+  if (csrfToken) {
+    headers['X-CSRFToken'] = csrfToken;
+  }
+  
+  return headers;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -21,8 +54,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const response = await fetch('http://localhost:8000/api/auth/check/', {
         credentials: 'include',
       });
-      setIsAuthenticated(response.ok);
+      
+      if (response.ok) {
+        const data = await response.json();
+        setIsAuthenticated(data.authenticated);
+      } else {
+        setIsAuthenticated(false);
+      }
     } catch (error) {
+      console.error('Auth check error:', error);
       setIsAuthenticated(false);
     } finally {
       setIsLoading(false);
@@ -33,19 +73,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const response = await fetch('http://localhost:8000/api/auth/login/', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: createHeaders(),
         body: JSON.stringify({ username, password }),
         credentials: 'include',
       });
 
-      if (response.ok) {
+      const data = await response.json();
+
+      if (response.ok && data.success) {
         setIsAuthenticated(true);
         return true;
+      } else if (data.error === 'Already authenticated') {
+        // User is already logged in, treat as success
+        console.log('User already authenticated, proceeding...');
+        setIsAuthenticated(true);
+        return true;
+      } else {
+        console.error('Login failed:', data.error);
+        return false;
       }
-      return false;
     } catch (error) {
+      console.error('Login error:', error);
       return false;
     }
   };
@@ -54,10 +102,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await fetch('http://localhost:8000/api/auth/logout/', {
         method: 'POST',
+        headers: createHeaders(),
         credentials: 'include',
       });
     } catch (error) {
-      // Ignore logout errors
+      console.error('Logout error:', error);
     } finally {
       setIsAuthenticated(false);
     }
