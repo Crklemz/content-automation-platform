@@ -1,3 +1,6 @@
+'use client';
+
+import { useState, useEffect } from 'react';
 import ProtectedRoute from './ProtectedRoute';
 import Link from "next/link";
 
@@ -9,55 +12,83 @@ interface DashboardStats {
   totalSites: number;
 }
 
-async function getDashboardStats(): Promise<DashboardStats> {
-  try {
-    // Fetch articles with different statuses
-    const [stats, sites] = await Promise.all([
-      Promise.all([
-        fetch("http://localhost:8000/api/articles/", { 
-          cache: "no-store",
-          credentials: 'include'
-        }),
-        fetch("http://localhost:8000/api/articles/?status=pending", { 
-          cache: "no-store",
-          credentials: 'include'
-        }),
-        fetch("http://localhost:8000/api/articles/?status=approved", { 
-          cache: "no-store",
-          credentials: 'include'
-        }),
-        fetch("http://localhost:8000/api/articles/?status=rejected", { 
-          cache: "no-store",
-          credentials: 'include'
-        }),
-      ]).then(responses => Promise.all(responses.map(r => r.json()))),
-      fetch("http://localhost:8000/api/sites/", { 
-        cache: "no-store",
-        credentials: 'include'
-      }).then(r => r.json())
-    ]);
+export default function AdminDashboard() {
+  const [stats, setStats] = useState<DashboardStats>({
+    totalArticles: 0,
+    pendingArticles: 0,
+    approvedArticles: 0,
+    rejectedArticles: 0,
+    totalSites: 0,
+  });
+  const [isLoading, setIsLoading] = useState(true);
 
-    return {
-      totalArticles: stats[0].count || 0,
-      pendingArticles: stats[1].count || 0,
-      approvedArticles: stats[2].count || 0,
-      rejectedArticles: stats[3].count || 0,
-      totalSites: sites.count || 0,
+  const getDashboardStats = async (): Promise<DashboardStats> => {
+    try {
+      // Fetch articles with different statuses
+      const [stats, sites] = await Promise.all([
+        Promise.all([
+          fetch("http://localhost:8000/api/articles/", { 
+            credentials: 'include'
+          }),
+          fetch("http://localhost:8000/api/articles/?status=pending", { 
+            credentials: 'include'
+          }),
+          fetch("http://localhost:8000/api/articles/?status=approved", { 
+            credentials: 'include'
+          }),
+          fetch("http://localhost:8000/api/articles/?status=rejected", { 
+            credentials: 'include'
+          }),
+        ]).then(responses => Promise.all(responses.map(r => r.json()))),
+        fetch("http://localhost:8000/api/sites/", { 
+          credentials: 'include'
+        }).then(r => r.json())
+      ]);
+
+      return {
+        totalArticles: stats[0].count || 0,
+        pendingArticles: stats[1].count || 0,
+        approvedArticles: stats[2].count || 0,
+        rejectedArticles: stats[3].count || 0,
+        totalSites: sites.count || 0,
+      };
+    } catch (error) {
+      console.error('Error fetching dashboard stats:', error);
+      return {
+        totalArticles: 0,
+        pendingArticles: 0,
+        approvedArticles: 0,
+        rejectedArticles: 0,
+        totalSites: 0,
+      };
+    }
+  };
+
+  useEffect(() => {
+    const loadStats = async () => {
+      setIsLoading(true);
+      try {
+        const dashboardStats = await getDashboardStats();
+        setStats(dashboardStats);
+      } catch (error) {
+        console.error('Error loading dashboard stats:', error);
+      } finally {
+        setIsLoading(false);
+      }
     };
-  } catch (error) {
-    console.error('Error fetching dashboard stats:', error);
-    return {
-      totalArticles: 0,
-      pendingArticles: 0,
-      approvedArticles: 0,
-      rejectedArticles: 0,
-      totalSites: 0,
-    };
+
+    loadStats();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <ProtectedRoute>
+        <div className="flex justify-center items-center h-64">
+          <div className="text-gray-600">Loading dashboard...</div>
+        </div>
+      </ProtectedRoute>
+    );
   }
-}
-
-export default async function AdminDashboard() {
-  const stats = await getDashboardStats();
 
   return (
     <ProtectedRoute>
@@ -199,7 +230,7 @@ export default async function AdminDashboard() {
               </Link>
               <Link
                 href="/admin/articles"
-                className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
                 Manage All Articles
               </Link>
