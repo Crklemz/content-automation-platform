@@ -1,52 +1,96 @@
+'use client';
+
+import { useState, useEffect } from 'react';
 import { notFound } from "next/navigation";
 import { Article } from "@/types";
 import { getSiteConfig } from "@/lib/getSiteConfig";
 
-async function getArticle(site: string, slug: string): Promise<Article | null> {
-  try {
-    const res = await fetch(`http://localhost:8000/api/articles/?site=${site}`, {
-      cache: "no-store",
-    });
-
-    if (!res.ok) {
-      console.error(`Articles API error: ${res.status} ${res.statusText}`);
-      return null;
-    }
-
-    const response = await res.json();
-    
-    let articles: Article[] = [];
-    
-    // Handle paginated response format
-    if (response && response.results && Array.isArray(response.results)) {
-      articles = response.results;
-    } else if (Array.isArray(response)) {
-      // Fallback for direct array response
-      articles = response;
-    } else {
-      console.error('Unexpected articles API response format:', response);
-      return null;
-    }
-    
-    return articles.find((a: Article) => a.slug === slug) || null;
-  } catch (error) {
-    console.error('Error fetching article:', error);
-    return null;
-  }
+interface ArticlePageProps {
+  params: Promise<{ site: string; slug: string }>;
 }
 
-export default async function ArticlePage(props: {
-  params: Promise<{ site: string; slug: string }>;
-}) {
-  const { site, slug } = await props.params;
+export default function ArticlePage({ params }: ArticlePageProps) {
+  const [article, setArticle] = useState<Article | null>(null);
+  const [siteConfig, setSiteConfig] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Fetch both site config and article
-  const [siteConfig, article] = await Promise.all([
-    getSiteConfig(site),
-    getArticle(site, slug)
-  ]);
+  const getArticle = async (site: string, slug: string): Promise<Article | null> => {
+    try {
+      const res = await fetch(`http://localhost:8000/api/articles/?site=${site}`, {
+        credentials: 'include'
+      });
 
-  if (!siteConfig || !article) {
+      if (!res.ok) {
+        console.error(`Articles API error: ${res.status} ${res.statusText}`);
+        return null;
+      }
+
+      const response = await res.json();
+      
+      let articles: Article[] = [];
+      
+      // Handle paginated response format
+      if (response && response.results && Array.isArray(response.results)) {
+        articles = response.results;
+      } else if (Array.isArray(response)) {
+        // Fallback for direct array response
+        articles = response;
+      } else {
+        console.error('Unexpected articles API response format:', response);
+        return null;
+      }
+      
+      return articles.find((a: Article) => a.slug === slug) || null;
+    } catch (error) {
+      console.error('Error fetching article:', error);
+      return null;
+    }
+  };
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const { site, slug } = await params;
+        
+        // Fetch both site config and article
+        const [config, articleData] = await Promise.all([
+          getSiteConfig(site),
+          getArticle(site, slug)
+        ]);
+
+        if (!config) {
+          setError('Site not found');
+          return;
+        }
+
+        if (!articleData) {
+          setError('Article not found');
+          return;
+        }
+
+        setSiteConfig(config);
+        setArticle(articleData);
+      } catch (error) {
+        console.error('Error loading article page:', error);
+        setError('Failed to load article');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadData();
+  }, [params]);
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="text-gray-600">Loading article...</div>
+      </div>
+    );
+  }
+
+  if (error || !siteConfig || !article) {
     notFound();
   }
 
@@ -56,7 +100,7 @@ export default async function ArticlePage(props: {
       <header className="mb-8">
         <div className="mb-4">
           <a 
-            href={`/${site}`}
+            href={`/${article.site}`}
             className="inline-flex items-center text-sm font-medium mb-4 hover:underline"
             style={{ color: siteConfig.primary_color }}
           >
@@ -79,6 +123,15 @@ export default async function ArticlePage(props: {
           <span className="mx-2">•</span>
           <span style={{ color: siteConfig.primary_color }}>
             {siteConfig.name}
+          </span>
+          {/* Show status for admin users */}
+          <span className="mx-2">•</span>
+          <span className={`px-2 py-1 rounded text-xs font-medium ${
+            article.status === 'approved' ? 'bg-green-100 text-green-800' :
+            article.status === 'rejected' ? 'bg-red-100 text-red-800' :
+            'bg-yellow-100 text-yellow-800'
+          }`}>
+            {article.status.charAt(0).toUpperCase() + article.status.slice(1)}
           </span>
         </div>
       </header>
@@ -123,7 +176,7 @@ export default async function ArticlePage(props: {
       {/* Back to Site */}
       <div className="mt-12 pt-8 border-t border-gray-200">
         <a 
-          href={`/${site}`}
+          href={`/${article.site}`}
           className="inline-flex items-center px-4 py-2 rounded-md font-medium transition-colors"
           style={{ 
             backgroundColor: siteConfig.primary_color,
