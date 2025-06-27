@@ -118,7 +118,7 @@ def api_logout(request):
 def api_check_auth(request):
     """Check authentication status"""
     try:
-        if request.user.is_authenticated and request.user.is_active and request.user.is_staff:
+        if request.user.is_authenticated and request.user.is_active:
             return JsonResponse({
                 'authenticated': True,
                 'user': {
