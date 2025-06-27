@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import ProtectedRoute from '../ProtectedRoute';
 import { Site } from '@/types/admin';
+import { createHeaders } from '@/lib/auth';
 
 interface TrendingTopic {
   title: string;
@@ -44,7 +45,10 @@ export default function AIContentPage() {
     setIsLoading(true);
     try {
       const response = await fetch(
-        `http://localhost:8000/api/articles/trending_topics/?site_slug=${selectedSite}&limit=3`
+        `http://localhost:8000/api/articles/trending_topics/?site_slug=${selectedSite}&limit=3`,
+        {
+          credentials: 'include'
+        }
       );
       const data = await response.json();
       setTopics(data.topics || []);
@@ -77,10 +81,9 @@ export default function AIContentPage() {
 
       const response = await fetch('http://localhost:8000/api/articles/generate_content/', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload)
+        headers: createHeaders(),
+        body: JSON.stringify(payload),
+        credentials: 'include'
       });
 
       const data = await response.json();
@@ -116,13 +119,12 @@ export default function AIContentPage() {
     try {
       const response = await fetch('http://localhost:8000/api/articles/generate_daily_top3/', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: createHeaders(),
         body: JSON.stringify({
           site_slug: selectedSite,
           topics: topics.slice(0, 3) // Use first 3 topics
-        })
+        }),
+        credentials: 'include'
       });
 
       const data = await response.json();
