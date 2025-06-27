@@ -48,7 +48,7 @@ class AINewsScraper:
     """AI-powered news scraper with advanced content analysis"""
     
     def __init__(self):
-        # RSS feeds for different categories
+        # RSS feeds for different categories - updated with working feeds
         self.rss_feeds = {
             'ai': [
                 'https://feeds.feedburner.com/TechCrunch/artificial-intelligence',
@@ -73,22 +73,23 @@ class AINewsScraper:
             ],
             'sustainability': [
                 'https://feeds.feedburner.com/TreeHugger',
-                'https://www.greenbiz.com/rss.xml',
-                'https://www.ecowatch.com/rss.xml',
-                'https://www.sustainablebrands.com/rss.xml',
-                'https://www.environmentalleader.com/feed/'
+                'https://www.sciencedaily.com/rss/earth_climate/environmental_science.xml',
+                'https://www.sciencedaily.com/rss/earth_climate/renewable_energy.xml',
+                'https://www.sciencedaily.com/rss/earth_climate/sustainability.xml',
+                'https://www.sciencedaily.com/rss/earth_climate/climate.xml'
             ],
             'green_living': [
                 'https://feeds.feedburner.com/TreeHugger',
-                'https://www.greenbiz.com/rss.xml',
-                'https://www.ecowatch.com/rss.xml',
-                'https://www.sustainablebrands.com/rss.xml',
-                'https://www.environmentalleader.com/feed/'
+                'https://www.sciencedaily.com/rss/earth_climate/environmental_science.xml',
+                'https://www.sciencedaily.com/rss/earth_climate/renewable_energy.xml',
+                'https://www.sciencedaily.com/rss/earth_climate/sustainability.xml',
+                'https://www.sciencedaily.com/rss/earth_climate/climate.xml'
             ],
             'general': [
                 'https://feeds.feedburner.com/TechCrunch/',
                 'https://www.wired.com/feed/rss',
-                'https://feeds.arstechnica.com/arstechnica/index'
+                'https://feeds.arstechnica.com/arstechnica/index',
+                'https://www.theverge.com/rss/index.xml'
             ]
         }
         
@@ -717,10 +718,35 @@ class AINewsScraper:
     def _fetch_rss_feed(self, feed_url: str, category: str) -> List[Dict]:
         """Fetch articles from an RSS feed"""
         try:
+            print(f"\n=== Fetching from feed: {feed_url} ===")
             feed = feedparser.parse(feed_url)
+            
+            # Debug feed status
+            print(f"Feed status: {getattr(feed, 'status', 'Unknown')}")
+            print(f"Feed version: {getattr(feed, 'version', 'Unknown')}")
+            print(f"Total entries in feed: {len(feed.entries)}")
+            
+            if not feed.entries:
+                print("WARNING: No entries found in feed!")
+                return []
+            
             articles = []
             
-            for entry in feed.entries[:10]:  # Limit to 10 articles per feed
+            for i, entry in enumerate(feed.entries[:10]):  # Get top 10 articles
+                print(f"\nProcessing entry {i+1}: {entry.get('title', 'No title')}")
+                
+                # Parse publication date (but don't filter by it for now)
+                published_date = None
+                if entry.get('published_parsed'):
+                    try:
+                        published_date = datetime(*entry.get('published_parsed')[:6])
+                        print(f"  Published date: {published_date}")
+                    except Exception as date_e:
+                        print(f"  Date parsing error: {date_e}")
+                        pass
+                else:
+                    print(f"  No published date found")
+                
                 article = {
                     'title': entry.get('title', ''),
                     'description': self._clean_description(entry.get('summary', '')),
@@ -728,14 +754,19 @@ class AINewsScraper:
                     'source': urlparse(entry.get('link', '')).netloc,
                     'category': category,
                     'published': entry.get('published', ''),
-                    'published_parsed': entry.get('published_parsed')
+                    'published_parsed': entry.get('published_parsed'),
+                    'published_date': published_date
                 }
                 articles.append(article)
+                print(f"  ADDED - Title: {article['title'][:50]}...")
             
+            print(f"\n=== RESULT: Got {len(articles)} articles from {feed_url} ===")
             return articles
             
         except Exception as e:
-            print(f"Error parsing RSS feed {feed_url}: {e}")
+            print(f"ERROR parsing RSS feed {feed_url}: {e}")
+            import traceback
+            traceback.print_exc()
             return []
     
     def _clean_description(self, description: str) -> str:
