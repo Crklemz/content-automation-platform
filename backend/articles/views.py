@@ -76,11 +76,20 @@ class ArticleViewSet(viewsets.ModelViewSet):
         
         # Check if user is authenticated and is staff
         user = cast(User, self.request.user)
+        print(f"DEBUG: User authenticated: {user.is_authenticated}")
+        print(f"DEBUG: User is staff: {user.is_staff}")
+        print(f"DEBUG: User is superuser: {user.is_superuser}")
+        print(f"DEBUG: User username: {user.username}")
+        print(f"DEBUG: Request path: {self.request.path}")
+        print(f"DEBUG: Request method: {self.request.method}")
+        
         if not user.is_authenticated or not user.is_staff:
             # Public users only see approved articles
+            print(f"DEBUG: Returning only approved articles (count: {queryset.filter(status='approved').count()})")
             return queryset.filter(status='approved')
         
         # Admin users can see all articles with filtering
+        print(f"DEBUG: Returning all articles (count: {queryset.count()})")
         return queryset
     
     def get_permissions(self):
