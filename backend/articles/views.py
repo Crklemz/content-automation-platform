@@ -74,26 +74,31 @@ class ArticleViewSet(viewsets.ModelViewSet):
         """
         queryset = Article.objects.select_related('site').all()
         
-        # For now, allow all articles to be visible
-        # TODO: Add proper authentication for admin interface
-        return queryset
+        # Check if user is authenticated and is staff
+        user = cast(User, self.request.user)
+        if not user.is_authenticated or not user.is_staff:
+            # Public users only see approved articles
+            return queryset.filter(status='approved')
         
-        # Check if this is a public request (no admin authentication)
-        # user = cast(User, self.request.user)
-        # if not user.is_staff:
-        #     # Public users only see approved articles
-        #     return queryset.filter(status='approved')
-        # 
-        # # Admin users can see all articles with filtering
-        # return queryset
+        # Admin users can see all articles with filtering
+        return queryset
+    
+    def get_permissions(self):
+        """
+        Set permissions based on action:
+        - Public actions (list, retrieve): AllowAny for approved articles
+        - Admin actions (create, update, delete, approve, reject): IsAdminUser
+        """
+        if self.action in ['list', 'retrieve']:
+            return [AllowAny()]
+        return [IsAdminUser()]
     
     @action(detail=True, methods=['post'])
     def approve(self, request: HttpRequest, pk=None):
         """Approve an article (admin only)"""
-        # TODO: Add proper authentication for admin interface
-        # user = cast(User, request.user)
-        # if not user.is_staff:
-        #     return Response({'error': 'Admin access required'}, status=status.HTTP_403_FORBIDDEN)
+        user = cast(User, request.user)
+        if not user.is_staff:
+            return Response({'error': 'Admin access required'}, status=status.HTTP_403_FORBIDDEN)
         
         article = self.get_object()
         article.status = 'approved'
@@ -103,19 +108,18 @@ class ArticleViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def reject(self, request: HttpRequest, pk=None):
         """Reject an article (admin only)"""
-        # TODO: Add proper authentication for admin interface
-        # user = cast(User, request.user)
-        # if not user.is_staff:
-        #     return Response({'error': 'Admin access required'}, status=status.HTTP_403_FORBIDDEN)
+        user = cast(User, request.user)
+        if not user.is_staff:
+            return Response({'error': 'Admin access required'}, status=status.HTTP_403_FORBIDDEN)
         
         article = self.get_object()
         article.status = 'rejected'
         article.save()
         return Response({'status': 'rejected'})
     
-    @action(detail=False, methods=['post'], permission_classes=[AllowAny])
+    @action(detail=False, methods=['post'], permission_classes=[IsAdminUser])
     def generate_content(self, request):
-        """Generate AI content for a site"""
+        """Generate AI content for a site (admin only)"""
         try:
             site_slug = request.data.get('site_slug')
             topic = request.data.get('topic')
@@ -164,9 +168,9 @@ class ArticleViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     
-    @action(detail=False, methods=['get'], permission_classes=[AllowAny])
+    @action(detail=False, methods=['get'], permission_classes=[IsAdminUser])
     def trending_topics(self, request):
-        """Get trending topics for content generation"""
+        """Get trending topics for content generation (admin only)"""
         try:
             site_slug = request.query_params.get('site_slug')
             category = request.query_params.get('category', 'general')
@@ -208,9 +212,9 @@ class ArticleViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-    @action(detail=False, methods=['get'], permission_classes=[AllowAny])
+    @action(detail=False, methods=['get'], permission_classes=[IsAdminUser])
     def news_summary(self, request):
-        """Get news summary for a specific topic with sources"""
+        """Get news summary for a specific topic with sources (admin only)"""
         try:
             topic = request.query_params.get('topic')
             site_slug = request.query_params.get('site_slug')
@@ -252,22 +256,15 @@ class ArticleViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-    @action(detail=False, methods=['post'], permission_classes=[AllowAny])
+    @action(detail=False, methods=['post'], permission_classes=[IsAdminUser])
     def generate_daily_top3(self, request):
-        """Generate a Daily Top 3 article combining multiple topics"""
+        """Generate a Daily Top 3 article combining multiple topics (admin only)"""
         try:
             site_slug = request.data.get('site_slug')
-            topics = request.data.get('topics', [])
             
             if not site_slug:
                 return Response(
                     {'error': 'site_slug is required'}, 
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
-            if not topics or len(topics) < 3:
-                return Response(
-                    {'error': 'At least 3 topics are required for Daily Top 3'}, 
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
@@ -280,9 +277,7 @@ class ArticleViewSet(viewsets.ModelViewSet):
                 )
             
             automation = ContentAutomation()
-            
-            # Generate Daily Top 3 article using the provided topics
-            article = automation.generate_daily_top3_from_topics(site, topics[:3])
+            article = automation.generate_daily_top_3_article(site)
             
             if article:
                 return Response({
@@ -297,6 +292,6 @@ class ArticleViewSet(viewsets.ModelViewSet):
                 
         except Exception as e:
             return Response(
-                {'error': f'Error generating Daily Top 3: {str(e)}'}, 
+                {'error': f'Error generating Daily Top 3 article: {str(e)}'}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
