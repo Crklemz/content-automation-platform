@@ -11,15 +11,60 @@ class AIContentGenerator:
     def __init__(self):
         # Check if OpenAI API key is available
         self.api_key = os.getenv('OPENAI_API_KEY')
+        print(f"Debug: OPENAI_API_KEY found: {'YES' if self.api_key else 'NO'}")
         if self.api_key:
+            print(f"Debug: API key starts with: {self.api_key[:10]}...")
+            
+            # Check for proxy-related environment variables
+            proxy_vars = {k: v for k, v in os.environ.items() if 'proxy' in k.lower() or 'PROXY' in k}
+            if proxy_vars:
+                print(f"Debug: Found proxy environment variables: {proxy_vars}")
+            
             try:
-                self.client = openai.OpenAI(api_key=self.api_key)
-                self.api_available = True
+                # Try a different approach - use requests session without proxies
+                import requests
+                import openai
+                
+                # Create a requests session without proxies
+                session = requests.Session()
+                session.proxies = {}
+                
+                # Try to initialize OpenAI client with custom session
+                try:
+                    from httpx import Client
+                    http_client = Client()
+                    self.client = openai.OpenAI(
+                        api_key=self.api_key,
+                        http_client=http_client
+                    )
+                    self.api_available = True
+                    print(f"OpenAI client initialized successfully with custom session for {self.api_key[:10]}...")
+                except Exception as session_e:
+                    print(f"Debug: Custom session approach failed: {session_e}")
+                    
+                    # Try the most basic approach possible
+                    try:
+                        # Import and clear any global state
+                        import openai
+                        openai.api_key = None
+                        openai.base_url = None
+                        
+                        # Try with absolute minimal configuration
+                        self.client = openai.OpenAI(api_key=self.api_key)
+                        self.api_available = True
+                        print(f"OpenAI client initialized successfully with minimal config for {self.api_key[:10]}...")
+                    except Exception as basic_e:
+                        print(f"Debug: Basic approach also failed: {basic_e}")
+                        raise basic_e
+                
             except Exception as e:
                 print(f"Warning: OpenAI client initialization failed: {e}")
+                print(f"Debug: Exception type: {type(e)}")
+                print(f"Debug: Exception args: {e.args}")
                 self.api_available = False
         else:
             print("Warning: OPENAI_API_KEY not found in environment variables")
+            print("Debug: Available environment variables:", [k for k in os.environ.keys() if 'OPENAI' in k])
             self.api_available = False
         
         # Initialize plagiarism prevention system
@@ -256,7 +301,7 @@ class AIContentGenerator:
     
     def generate_daily_top_3_article(self, site_description: str, scraped_articles: List[Dict], site: Site) -> Dict:
         """
-        Generate a "Daily Top 3" format article from scraped content
+        Generate a "Daily Top 3" format article from scraped content using AI
         
         Args:
             site_description: The site's description/topic
@@ -292,8 +337,11 @@ class AIContentGenerator:
             clean_site_description = site_description.rstrip('.')
             main_title = f"Top 3 {clean_site_description}: {main_topics_text}"
             
-            # Create overall summary of all 3 articles
-            overall_summary = self._create_overall_summary(scraped_articles[:3], site_description)
+            # Use AI to create better overall summary if available
+            if self.api_available:
+                overall_summary = self._create_ai_overall_summary(scraped_articles[:3], site_description, site)
+            else:
+                overall_summary = self._create_overall_summary(scraped_articles[:3], site_description)
             
             # Create individual article summaries with proper formatting
             article_summaries = []
@@ -307,6 +355,12 @@ class AIContentGenerator:
                 category = article.get('category', 'General')
                 main_topic = main_topics[i] if i < len(main_topics) else 'General'
                 
+                # Use AI to enhance the summary if available
+                if self.api_available and summary:
+                    enhanced_summary = self._enhance_article_summary(summary, title, main_topic, site_description)
+                else:
+                    enhanced_summary = summary
+                
                 # Create clickable title link
                 title_link = f'<a href="{url}" target="_blank" rel="noopener noreferrer" class="article-title-link">{title}</a>' if url else title
                 
@@ -314,7 +368,7 @@ class AIContentGenerator:
                 individual_summary = f"""
                 <div class="article-item">
                     <h3><strong>{title_link}</strong></h3>
-                    <p class="article-summary">{summary}</p>
+                    <p class="article-summary">{enhanced_summary}</p>
                     <div class="article-meta">
                         <span class="category">{main_topic}</span>
                         <span class="source">Source: <a href="{url}" target="_blank" rel="noopener noreferrer">{source}</a></span>
@@ -432,3 +486,109 @@ class AIContentGenerator:
         summary += f"These stories represent the most relevant and engaging content currently circulating in this space, providing valuable insights for anyone interested in staying current with {site_description}. The articles demonstrate the dynamic nature of this field and highlight emerging trends that could have significant implications for the industry."
         
         return summary
+    
+    def _create_ai_overall_summary(self, articles: List[Dict], site_description: str, site: Site) -> str:
+        """Create an AI-enhanced overall summary of all articles"""
+        if not articles:
+            return f"Currently, there are limited trending articles available for {site_description}."
+        
+        try:
+            # Prepare article data for AI
+            articles_text = ""
+            for i, article in enumerate(articles, 1):
+                title = article.get('title', '')
+                summary = article.get('summary', '')
+                source = article.get('source', 'Unknown')
+                articles_text += f"{i}. {title} (Source: {source})\n   Summary: {summary}\n\n"
+            
+            prompt = f"""
+            Create a compelling overall summary for a "Daily Top 3" article about {site_description}.
+            
+            Site: {site.name}
+            Site Description: {site_description}
+            
+            Here are the 3 top articles for today:
+            
+            {articles_text}
+            
+            Please create a 2-3 sentence summary that:
+            - Highlights the key themes and trends across these articles
+            - Explains why these stories matter for {site_description}
+            - Provides context about the broader implications
+            - Uses engaging, professional language
+            - Avoids repetition and creates a cohesive narrative
+            
+            Write only the summary text, no additional formatting.
+            """
+            
+            response = self.client.chat.completions.create(
+                model="gpt-4",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a professional content writer creating engaging summaries for technology and business articles."
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                max_tokens=300,
+                temperature=0.7
+            )
+            
+            content = response.choices[0].message.content
+            return content.strip() if content else self._create_overall_summary(articles, site_description)
+            
+        except Exception as e:
+            print(f"Error creating AI overall summary: {e}")
+            # Fallback to non-AI summary
+            return self._create_overall_summary(articles, site_description)
+    
+    def _enhance_article_summary(self, summary: str, title: str, topic: str, site_description: str) -> str:
+        """Enhance an article summary using AI"""
+        if not summary or len(summary.strip()) < 10:
+            return summary
+        
+        try:
+            prompt = f"""
+            Enhance this article summary to make it more engaging and informative:
+            
+            Original Title: {title}
+            Topic: {topic}
+            Site Context: {site_description}
+            Original Summary: {summary}
+            
+            Please enhance the summary to:
+            - Make it more engaging and readable
+            - Add context about why this matters
+            - Keep it concise (2-3 sentences max)
+            - Maintain accuracy to the original
+            - Use professional but accessible language
+            
+            Return only the enhanced summary, no additional text.
+            """
+            
+            response = self.client.chat.completions.create(
+                model="gpt-4",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a professional content editor enhancing article summaries."
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                max_tokens=200,
+                temperature=0.6
+            )
+            
+            content = response.choices[0].message.content
+            return content.strip() if content else summary
+            
+        except Exception as e:
+            print(f"Error enhancing article summary: {e}")
+            # Return original summary if AI enhancement fails
+            return summary
