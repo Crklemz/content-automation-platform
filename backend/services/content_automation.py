@@ -295,4 +295,49 @@ class ContentAutomation:
             
         except Exception as e:
             print(f"Error generating Daily Top 3 for site {site.name}: {e}")
+            return None
+    
+    def generate_daily_top_3_article(self, site: Site) -> Optional[Article]:
+        """
+        Generate a Daily Top 3 article for a site using trending topics
+        
+        Args:
+            site: The site to generate content for
+            
+        Returns:
+            Created Article object or None if failed
+        """
+        try:
+            # Get trending topics for the site
+            topics = self.news_scraper.get_site_specific_topics(site.description, limit=3)
+            
+            if len(topics) < 3:
+                print(f"Not enough trending topics for Daily Top 3, got {len(topics)}")
+                return None
+            
+            # Generate Daily Top 3 article using AI
+            article_data = self.ai_generator.generate_daily_top_3_article(
+                site.description, 
+                topics[:3],  # Use first 3 topics
+                site
+            )
+            
+            # Create article slug from title
+            slug = self._create_slug(article_data['title'])
+            
+            # Create the article
+            article = Article.objects.create(
+                title=article_data['title'],
+                body=article_data['body'],
+                slug=slug,
+                site=site,
+                status='pending',
+                sources=article_data.get('sources', [])
+            )
+            
+            print(f"Generated Daily Top 3 article: {article.title} for {site.name}")
+            return article
+            
+        except Exception as e:
+            print(f"Error generating Daily Top 3 for site {site.name}: {e}")
             return None 
