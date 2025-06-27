@@ -19,15 +19,41 @@ from .models import Article
 from .serializers import ArticleSerializer
 
 class ArticleFilter(filters.FilterSet):
-    """Filter articles by site, status, and date range"""
+    """Filter articles by site, status, date range, and category"""
     site = filters.CharFilter(field_name='site__slug', lookup_expr='exact')
     status = filters.CharFilter(lookup_expr='exact')
     created_after = filters.DateTimeFilter(field_name='created_at', lookup_expr='gte')
     created_before = filters.DateTimeFilter(field_name='created_at', lookup_expr='lte')
+    category = filters.CharFilter(method='filter_by_category')
     
     class Meta:
         model = Article
-        fields = ['site', 'status', 'created_after', 'created_before']
+        fields = ['site', 'status', 'created_after', 'created_before', 'category']
+    
+    def filter_by_category(self, queryset, name, value):
+        """Filter articles by category based on content analysis"""
+        if not value or value == 'all':
+            return queryset
+        
+        # Simple keyword-based category filtering
+        category_keywords = {
+            'ai': ['artificial intelligence', 'machine learning', 'AI', 'ML', 'GPT', 'neural network'],
+            'business': ['business', 'startup', 'entrepreneur', 'funding', 'investment', 'market'],
+            'sustainability': ['sustainable', 'sustainability', 'green', 'environment', 'climate', 'eco-friendly'],
+            'green-living': ['sustainable', 'green', 'environment', 'climate', 'eco-friendly', 'living', 'lifestyle'],
+            'general': []
+        }
+        
+        keywords = category_keywords.get(value.lower(), [])
+        if not keywords:
+            return queryset
+        
+        from django.db.models import Q
+        query = Q()
+        for keyword in keywords:
+            query |= Q(title__icontains=keyword) | Q(body__icontains=keyword)
+        
+        return queryset.filter(query)
 
 class ArticleViewSet(viewsets.ModelViewSet):
     """
