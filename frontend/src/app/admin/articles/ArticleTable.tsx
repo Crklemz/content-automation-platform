@@ -187,8 +187,13 @@ export default function ArticleTable({ articles, sites }: ArticleTableProps) {
                 <td className="px-6 py-4">
                   <div>
                     <div className="text-sm font-medium text-gray-900">{article.title}</div>
-                    <div className="text-sm text-gray-500">
-                      {article.body.replace(/<[^>]+>/g, "").substring(0, 100)}...
+                    <div className="text-sm text-gray-500 mt-1">
+                      {article.body
+                        .replace(/<h[1-6][^>]*>.*?<\/h[1-6]>/gi, '') // Remove headings
+                        .replace(/<[^>]+>/g, '') // Remove remaining HTML tags
+                        .replace(/\s+/g, ' ') // Normalize whitespace
+                        .trim()
+                        .substring(0, 120)}...
                     </div>
                   </div>
                 </td>

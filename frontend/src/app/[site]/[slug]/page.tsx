@@ -139,7 +139,7 @@ export default function ArticlePage({ params }: ArticlePageProps) {
       {/* Article Content */}
       <article className="prose prose-lg max-w-none">
         <div 
-          className="text-gray-800 leading-relaxed"
+          className="text-gray-800 leading-relaxed space-y-4"
           dangerouslySetInnerHTML={{ __html: article.body }}
         />
       </article>
