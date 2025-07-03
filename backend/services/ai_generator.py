@@ -11,24 +11,8 @@ class AIContentGenerator:
     def __init__(self):
         # Check if OpenAI API key is available
         self.api_key = os.getenv('OPENAI_API_KEY')
-        print(f"Debug: OPENAI_API_KEY found: {'YES' if self.api_key else 'NO'}")
         if self.api_key:
-            print(f"Debug: API key starts with: {self.api_key[:10]}...")
-            
-            # Check for proxy-related environment variables
-            proxy_vars = {k: v for k, v in os.environ.items() if 'proxy' in k.lower() or 'PROXY' in k}
-            if proxy_vars:
-                print(f"Debug: Found proxy environment variables: {proxy_vars}")
-            
             try:
-                # Try a different approach - use requests session without proxies
-                import requests
-                import openai
-                
-                # Create a requests session without proxies
-                session = requests.Session()
-                session.proxies = {}
-                
                 # Try to initialize OpenAI client with custom session
                 try:
                     from httpx import Client
@@ -38,33 +22,22 @@ class AIContentGenerator:
                         http_client=http_client
                     )
                     self.api_available = True
-                    print(f"OpenAI client initialized successfully with custom session for {self.api_key[:10]}...")
-                except Exception as session_e:
-                    print(f"Debug: Custom session approach failed: {session_e}")
-                    
-                    # Try the most basic approach possible
+                except Exception:
+                    # Try with basic configuration
                     try:
-                        # Import and clear any global state
-                        import openai
+                        # Clear any global state
                         openai.api_key = None
                         openai.base_url = None
                         
-                        # Try with absolute minimal configuration
+                        # Try with minimal configuration
                         self.client = openai.OpenAI(api_key=self.api_key)
                         self.api_available = True
-                        print(f"OpenAI client initialized successfully with minimal config for {self.api_key[:10]}...")
-                    except Exception as basic_e:
-                        print(f"Debug: Basic approach also failed: {basic_e}")
-                        raise basic_e
+                    except Exception:
+                        self.api_available = False
                 
-            except Exception as e:
-                print(f"Warning: OpenAI client initialization failed: {e}")
-                print(f"Debug: Exception type: {type(e)}")
-                print(f"Debug: Exception args: {e.args}")
+            except Exception:
                 self.api_available = False
         else:
-            print("Warning: OPENAI_API_KEY not found in environment variables")
-            print("Debug: Available environment variables:", [k for k in os.environ.keys() if 'OPENAI' in k])
             self.api_available = False
         
         # Initialize plagiarism prevention system
@@ -150,13 +123,11 @@ class AIContentGenerator:
                 return self._generate_mock_content(topic, site, max_length, sources)
             
         except Exception as e:
-            print(f"Error generating article with OpenAI: {e}")
             # Fallback to mock content
             return self._generate_mock_content(topic, site, max_length, sources)
     
     def _generate_mock_content(self, topic: str, site: Site, max_length: int, sources: Optional[List[Dict]] = None) -> Dict:
         """Generate mock content when AI API is not available with plagiarism prevention"""
-        print(f"Generating mock content for topic: {topic}")
         
         # Create a structured mock article with source attribution
         title = f"Understanding {topic}: A Comprehensive Guide for {site.name}"
@@ -355,11 +326,8 @@ class AIContentGenerator:
                 category = article.get('category', 'General')
                 main_topic = main_topics[i] if i < len(main_topics) else 'General'
                 
-                # Use AI to enhance the summary if available
-                if self.api_available and summary:
-                    enhanced_summary = self._enhance_article_summary(summary, title, main_topic, site_description)
-                else:
-                    enhanced_summary = summary
+                # Use the summary as-is (no enhancement needed)
+                article_summary = summary
                 
                 # Create clickable title link
                 title_link = f'<a href="{url}" target="_blank" rel="noopener noreferrer" class="article-title-link">{title}</a>' if url else title
@@ -368,7 +336,7 @@ class AIContentGenerator:
                 individual_summary = f"""
                 <div class="article-item">
                     <h3><strong>{title_link}</strong></h3>
-                    <p class="article-summary">{enhanced_summary}</p>
+                    <p class="article-summary">{article_summary}</p>
                     <div class="article-meta">
                         <span class="category">{main_topic}</span>
                         <span class="source">Source: <a href="{url}" target="_blank" rel="noopener noreferrer">{source}</a></span>
@@ -544,51 +512,3 @@ class AIContentGenerator:
             print(f"Error creating AI overall summary: {e}")
             # Fallback to non-AI summary
             return self._create_overall_summary(articles, site_description)
-    
-    def _enhance_article_summary(self, summary: str, title: str, topic: str, site_description: str) -> str:
-        """Enhance an article summary using AI"""
-        if not summary or len(summary.strip()) < 10:
-            return summary
-        
-        try:
-            prompt = f"""
-            Enhance this article summary to make it more engaging and informative:
-            
-            Original Title: {title}
-            Topic: {topic}
-            Site Context: {site_description}
-            Original Summary: {summary}
-            
-            Please enhance the summary to:
-            - Make it more engaging and readable
-            - Add context about why this matters
-            - Keep it concise (2-3 sentences max)
-            - Maintain accuracy to the original
-            - Use professional but accessible language
-            
-            Return only the enhanced summary, no additional text.
-            """
-            
-            response = self.client.chat.completions.create(
-                model="gpt-4",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are a professional content editor enhancing article summaries."
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                max_tokens=200,
-                temperature=0.6
-            )
-            
-            content = response.choices[0].message.content
-            return content.strip() if content else summary
-            
-        except Exception as e:
-            print(f"Error enhancing article summary: {e}")
-            # Return original summary if AI enhancement fails
-            return summary

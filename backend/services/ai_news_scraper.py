@@ -590,7 +590,7 @@ class AINewsScraper:
         return list(set(entities))[:10]  # Limit to top 10
     
     def _create_ai_summary(self, content: str) -> str:
-        """Create intelligent summary of content"""
+        """Create intelligent, engaging summary of content"""
         if not content:
             return ""
         
@@ -601,27 +601,78 @@ class AINewsScraper:
         if not meaningful_sentences:
             return content[:200] + "..." if len(content) > 200 else content
         
-        # Score sentences by importance (simple heuristic)
+        # Enhanced sentence scoring for better summaries
         sentence_scores = []
-        for sentence in meaningful_sentences[:10]:  # Limit to first 10 sentences
+        for sentence in meaningful_sentences[:15]:  # Consider more sentences for better selection
             score = 0
-            # Longer sentences get higher scores
-            score += len(sentence) * 0.1
-            # Sentences with keywords get higher scores
+            
+            # Base score from length (prefer medium-length sentences)
+            sentence_length = len(sentence)
+            if 50 <= sentence_length <= 150:
+                score += 20  # Optimal length
+            elif 30 <= sentence_length <= 200:
+                score += 10  # Acceptable length
+            else:
+                score += 5   # Too short or too long
+            
+            # Boost sentences with important keywords
+            sentence_lower = sentence.lower()
             for keyword in self.topic_keywords.keys():
-                if keyword in sentence.lower():
-                    score += 10
+                if keyword in sentence_lower:
+                    score += 15
+            
+            # Boost sentences that start with important words
+            important_starts = ['the', 'this', 'new', 'latest', 'recent', 'important', 'key', 'major', 'significant']
+            if any(sentence_lower.startswith(start) for start in important_starts):
+                score += 5
+            
+            # Boost sentences with numbers (often contain important data)
+            if re.search(r'\d+', sentence):
+                score += 8
+            
+            # Boost sentences with company/product names (capitalized words)
+            capitalized_words = re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b', sentence)
+            if len(capitalized_words) > 0:
+                score += 5
+            
+            # Penalize sentences that are too generic
+            generic_phrases = ['it is', 'this is', 'there is', 'there are', 'it has', 'this has']
+            if any(phrase in sentence_lower for phrase in generic_phrases):
+                score -= 5
+            
             sentence_scores.append((sentence, score))
         
-        # Sort by score and take top 3
+        # Sort by score and take top 2-3 sentences
         sentence_scores.sort(key=lambda x: x[1], reverse=True)
         top_sentences = [s[0] for s in sentence_scores[:3]]
         
-        summary = '. '.join(top_sentences) + '.'
+        # Create a more engaging summary
+        if len(top_sentences) >= 2:
+            # Combine sentences more naturally
+            summary = '. '.join(top_sentences) + '.'
+        else:
+            summary = top_sentences[0] + '.' if top_sentences else ""
         
-        # Limit length
-        if len(summary) > 300:
-            summary = summary[:300].rsplit('.', 1)[0] + '.'
+        # Ensure the summary is engaging and informative
+        if summary:
+            # Add context if the summary seems too brief
+            if len(summary) < 100 and len(content) > 500:
+                # Try to add one more sentence for context
+                remaining_sentences = [s[0] for s in sentence_scores[3:6]]
+                if remaining_sentences:
+                    summary += ' ' + remaining_sentences[0] + '.'
+        
+        # Limit length while preserving complete sentences
+        if len(summary) > 350:
+            # Try to cut at a sentence boundary
+            sentences = summary.split('. ')
+            truncated = ""
+            for sentence in sentences:
+                if len(truncated + sentence) <= 350:
+                    truncated += sentence + '. '
+                else:
+                    break
+            summary = truncated.strip()
         
         return summary
     
