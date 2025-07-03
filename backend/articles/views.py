@@ -304,3 +304,64 @@ class ArticleViewSet(viewsets.ModelViewSet):
                 {'error': f'Error generating Daily Top 3 article: {str(e)}'}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+    @action(detail=False, methods=['post'], permission_classes=[IsAdminUser])
+    def generate_structured_content(self, request):
+        """Generate AI content and return structured data (admin only)"""
+        try:
+            site_slug = request.data.get('site_slug')
+            topic = request.data.get('topic')
+            count = request.data.get('count', 1)
+            
+            if not site_slug:
+                return Response(
+                    {'error': 'site_slug is required'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            try:
+                site = Site.objects.get(slug=site_slug)
+            except Site.DoesNotExist:
+                return Response(
+                    {'error': f'Site with slug "{site_slug}" not found'}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            automation = ContentAutomation()
+            
+            if topic:
+                # Generate content for specific topic
+                article_data = automation.ai_generator.generate_article_from_topic(topic, site)
+                if article_data:
+                    return Response({
+                        'message': f'Generated structured article: {article_data["title"]}',
+                        'article_data': article_data
+                    })
+                else:
+                    return Response(
+                        {'error': 'Failed to generate article'}, 
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                    )
+            else:
+                # Generate Daily Top 3 content
+                article_data = automation.ai_generator.generate_daily_top_3_article(
+                    site.description,
+                    automation.news_scraper.get_site_specific_topics(site.description, count),
+                    site
+                )
+                if article_data:
+                    return Response({
+                        'message': f'Generated structured Daily Top 3: {article_data["title"]}',
+                        'article_data': article_data
+                    })
+                else:
+                    return Response(
+                        {'error': 'Failed to generate Daily Top 3 content'}, 
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                    )
+                
+        except Exception as e:
+            return Response(
+                {'error': f'Error generating structured content: {str(e)}'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
