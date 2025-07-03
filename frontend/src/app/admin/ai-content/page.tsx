@@ -560,27 +560,6 @@ export default function AIContentPage() {
               <h1 className="text-2xl font-bold mb-6">{generatedArticle.title}</h1>
               
               {generatedArticle.sections.map((section, index) => renderSection(section, index))}
-              
-              {generatedArticle.sources.length > 0 && (
-                <div className="mt-8 p-4 bg-gray-50 rounded-lg">
-                  <h3 className="font-medium text-gray-900 mb-3">Sources and Further Reading</h3>
-                  <ul className="space-y-2">
-                    {generatedArticle.sources.map((source, index) => (
-                      <li key={index} className="text-sm">
-                        <a
-                          href={source.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-800 underline"
-                        >
-                          {source.title}
-                        </a>
-                        {' - '}{source.source}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
             </div>
           </div>
         )}

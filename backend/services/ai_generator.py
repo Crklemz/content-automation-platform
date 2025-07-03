@@ -153,31 +153,6 @@ class AIContentGenerator:
             }
         ]
         
-        # Add sources section if sources are provided
-        if sources:
-            sources_section = {
-                'type': 'heading',
-                'level': 2,
-                'content': 'Sources and Further Reading'
-            }
-            sections.append(sources_section)
-            
-            sources_list = {
-                'type': 'list',
-                'style': 'unordered',
-                'items': []
-            }
-            
-            for source in sources:
-                source_item = {
-                    'type': 'list_item',
-                    'content': f"{source.get('title', 'Unknown')} - {source.get('source', 'Unknown')}",
-                    'url': source.get('url', '')
-                }
-                sources_list['items'].append(source_item)
-            
-            sections.append(sources_list)
-        
         # Analyze for plagiarism even in mock content
         body_text = ' '.join([section['content'] for section in sections if section['type'] == 'paragraph'])
         plagiarism_analysis = self.plagiarism_checker.analyze_content_for_plagiarism(
@@ -223,7 +198,7 @@ class AIContentGenerator:
         - Use sources for facts, data, and insights only
         - Write everything in your own unique voice and style
         - Provide proper attribution to sources
-        - Include a "Sources and Further Reading" section at the end
+        - DO NOT include a "Sources and Further Reading" section (this is handled separately)
         
         Please provide the article in this JSON format:
         
@@ -439,29 +414,6 @@ class AIContentGenerator:
                     'url': url,
                     'source': source
                 })
-            
-            # Sources section
-            sections.append({
-                'type': 'heading',
-                'level': 3,
-                'content': "Sources and Further Reading"
-            })
-            
-            sources_list = {
-                'type': 'list',
-                'style': 'unordered',
-                'items': []
-            }
-            
-            for source in sources:
-                source_item = {
-                    'type': 'list_item',
-                    'content': f"{source['title']} - {source['source']}",
-                    'url': source['url']
-                }
-                sources_list['items'].append(source_item)
-            
-            sections.append(sources_list)
             
             return {
                 'title': main_title,
