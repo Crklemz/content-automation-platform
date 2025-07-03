@@ -6,65 +6,50 @@ from articles.models import Article, Site
 from .plagiarism_prevention import PlagiarismPrevention
 
 class AIContentGenerator:
-    """AI-powered content generation service using OpenAI with plagiarism prevention"""
+    """AI-powered content generator with plagiarism prevention"""
     
     def __init__(self):
         # Check if OpenAI API key is available
         self.api_key = os.getenv('OPENAI_API_KEY')
-        if self.api_key:
-            try:
-                # Try to initialize OpenAI client with custom session
-                try:
-                    from httpx import Client
-                    http_client = Client()
-                    self.client = openai.OpenAI(
-                        api_key=self.api_key,
-                        http_client=http_client
-                    )
-                    self.api_available = True
-                except Exception:
-                    # Try with basic configuration
-                    try:
-                        # Clear any global state
-                        openai.api_key = None
-                        openai.base_url = None
-                        
-                        # Try with minimal configuration
-                        self.client = openai.OpenAI(api_key=self.api_key)
-                        self.api_available = True
-                    except Exception:
-                        self.api_available = False
-                
-            except Exception:
-                self.api_available = False
-        else:
-            self.api_available = False
+        self.api_available = bool(self.api_key)
         
-        # Initialize plagiarism prevention system
+        if self.api_available:
+            try:
+                self.client = openai.OpenAI(api_key=self.api_key)
+                # Test the connection
+                self.client.models.list()
+                print("OpenAI API connection successful")
+            except Exception as e:
+                print(f"OpenAI API connection failed: {e}")
+                self.api_available = False
+        
         self.plagiarism_checker = PlagiarismPrevention()
     
     def generate_article_from_topic(self, topic: str, site: Site, max_length: int = 800, sources: Optional[List[Dict]] = None) -> Dict:
         """
-        Generate an article from a given topic for a specific site with plagiarism prevention
+        Generate an article from a topic using AI with plagiarism prevention
         
         Args:
             topic: The topic to write about
-            site: The site object with branding info
-            max_length: Maximum article length in words
-            sources: List of source articles for attribution
+            site: The site to create content for
+            max_length: Maximum word count
+            sources: Optional list of source articles
             
         Returns:
-            Dict containing title, body, sources, and plagiarism analysis
+            Dict containing structured article data
         """
-        if not self.api_available:
-            # Fallback to mock content generation
-            return self._generate_mock_content(topic, site, max_length, sources)
-        
         try:
-            # Validate source quality first
-            source_quality = self.plagiarism_checker.validate_source_quality(sources or [])
-            
-            # Create site-specific prompt with enhanced source attribution
+            if self.api_available:
+                return self._generate_ai_content(topic, site, max_length, sources)
+            else:
+                return self._generate_mock_content(topic, site, max_length, sources)
+        except Exception as e:
+            print(f"Error generating article: {e}")
+            return self._generate_mock_content(topic, site, max_length, sources)
+    
+    def _generate_ai_content(self, topic: str, site: Site, max_length: int, sources: Optional[List[Dict]] = None) -> Dict:
+        """Generate content using OpenAI API with plagiarism prevention"""
+        try:
             prompt = self._create_enhanced_prompt_with_sources(topic, site, max_length, sources)
             
             response = self.client.chat.completions.create(
@@ -72,14 +57,7 @@ class AIContentGenerator:
                 messages=[
                     {
                         "role": "system",
-                        "content": f"You are a professional content writer for {site.name}. "
-                                  f"Write engaging, informative articles that match the site's "
-                                  f"branding and style. Use a {site.primary_color} and {site.secondary_color} "
-                                  f"color scheme in your writing style. "
-                                  f"CRITICAL: Always create original content based on the information provided. "
-                                  f"Never copy text directly from sources. "
-                                  f"Use sources for facts and insights, but write in your own words. "
-                                  f"Always provide proper attribution to sources and avoid plagiarism."
+                        "content": "You are a professional content writer creating engaging, original articles. Always write in your own words and provide proper attribution to sources."
                     },
                     {
                         "role": "user",
@@ -91,73 +69,119 @@ class AIContentGenerator:
             )
             
             content = response.choices[0].message.content
-            
-            # Parse the response into title and body
             if content:
                 parsed_content = self._parse_ai_response(content)
-                
-                # Get the generated content
-                generated_content = parsed_content.get('body', content)
-                
-                # Analyze for plagiarism
-                plagiarism_analysis = self.plagiarism_checker.analyze_content_for_plagiarism(
-                    generated_content, sources or []
-                )
-                
-                # Enhance content with proper attribution
-                enhanced_content = self.plagiarism_checker.enhance_content_with_attribution(
-                    generated_content, sources or []
-                )
-                
-                return {
-                    'title': parsed_content.get('title', f"Article about {topic}"),
-                    'body': enhanced_content,
-                    'sources': sources or [],
-                    'status': 'pending',
-                    'plagiarism_analysis': plagiarism_analysis,
-                    'source_quality': source_quality,
-                    'is_original': plagiarism_analysis.get('is_original', True),
-                    'confidence_score': plagiarism_analysis.get('confidence_score', 0.0)
-                }
             else:
                 return self._generate_mock_content(topic, site, max_length, sources)
             
+            # Analyze for plagiarism
+            body_text = ' '.join([section['content'] for section in parsed_content.get('sections', []) if section['type'] == 'paragraph'])
+            plagiarism_analysis = self.plagiarism_checker.analyze_content_for_plagiarism(
+                body_text, sources or []
+            )
+            
+            # Validate source quality
+            source_quality = self.plagiarism_checker.validate_source_quality(sources or [])
+            
+            return {
+                'title': parsed_content['title'],
+                'sections': parsed_content.get('sections', []),
+                'sources': sources or [],
+                'status': 'pending',
+                'plagiarism_analysis': plagiarism_analysis,
+                'source_quality': source_quality,
+                'is_original': plagiarism_analysis.get('is_original', True),
+                'confidence_score': plagiarism_analysis.get('confidence_score', 0.0)
+            }
+            
         except Exception as e:
-            # Fallback to mock content
+            print(f"Error generating AI content: {e}")
             return self._generate_mock_content(topic, site, max_length, sources)
     
     def _generate_mock_content(self, topic: str, site: Site, max_length: int, sources: Optional[List[Dict]] = None) -> Dict:
         """Generate mock content when AI API is not available with plagiarism prevention"""
         
-        # Create a structured mock article with source attribution
+        # Create structured mock article data
         title = f"Understanding {topic}: A Comprehensive Guide for {site.name}"
         
-        # Create source attribution section if sources are provided
-        sources_section = ""
+        # Create structured content sections
+        sections = [
+            {
+                'type': 'heading',
+                'level': 2,
+                'content': f'Introduction to {topic}'
+            },
+            {
+                'type': 'paragraph',
+                'content': f'In today\'s rapidly evolving digital landscape, understanding {topic} has become increasingly important for professionals and enthusiasts alike. This comprehensive guide explores the key aspects of {topic} and its relevance in modern technology.'
+            },
+            {
+                'type': 'heading',
+                'level': 2,
+                'content': 'Key Concepts'
+            },
+            {
+                'type': 'paragraph',
+                'content': f'{topic} encompasses several fundamental principles that are essential for anyone looking to stay current in this field. From basic concepts to advanced applications, this topic offers a wealth of knowledge for continuous learning.'
+            },
+            {
+                'type': 'heading',
+                'level': 2,
+                'content': 'Practical Applications'
+            },
+            {
+                'type': 'paragraph',
+                'content': f'The practical applications of {topic} are vast and varied. Whether you\'re a developer, business professional, or technology enthusiast, understanding these applications can provide significant advantages in your respective field.'
+            },
+            {
+                'type': 'heading',
+                'level': 2,
+                'content': 'Future Trends'
+            },
+            {
+                'type': 'paragraph',
+                'content': f'As technology continues to advance, the landscape of {topic} is expected to evolve significantly. Staying informed about emerging trends and developments is crucial for maintaining a competitive edge.'
+            },
+            {
+                'type': 'heading',
+                'level': 2,
+                'content': 'Conclusion'
+            },
+            {
+                'type': 'paragraph',
+                'content': f'{topic} represents a fundamental aspect of modern technology that continues to shape our digital world. By understanding its principles and applications, individuals and organizations can better navigate the complexities of today\'s technological landscape.'
+            }
+        ]
+        
+        # Add sources section if sources are provided
         if sources:
-            sources_section = self.plagiarism_checker._create_attribution_section(sources)
-        
-        body = f"""
-        <h2>Introduction to {topic}</h2>
-        <p>In today's rapidly evolving digital landscape, understanding {topic} has become increasingly important for professionals and enthusiasts alike. This comprehensive guide explores the key aspects of {topic} and its relevance in modern technology.</p>
-        
-        <h2>Key Concepts</h2>
-        <p>{topic} encompasses several fundamental principles that are essential for anyone looking to stay current in this field. From basic concepts to advanced applications, this topic offers a wealth of knowledge for continuous learning.</p>
-        
-        <h2>Practical Applications</h2>
-        <p>The practical applications of {topic} are vast and varied. Whether you're a developer, business professional, or technology enthusiast, understanding these applications can provide significant advantages in your respective field.</p>
-        
-        <h2>Future Trends</h2>
-        <p>As technology continues to advance, the landscape of {topic} is expected to evolve significantly. Staying informed about emerging trends and developments is crucial for maintaining a competitive edge.</p>
-        
-        <h2>Conclusion</h2>
-        <p>{topic} represents a fundamental aspect of modern technology that continues to shape our digital world. By understanding its principles and applications, individuals and organizations can better navigate the complexities of today's technological landscape.</p>
-        {sources_section}
-        """
+            sources_section = {
+                'type': 'heading',
+                'level': 2,
+                'content': 'Sources and Further Reading'
+            }
+            sections.append(sources_section)
+            
+            sources_list = {
+                'type': 'list',
+                'style': 'unordered',
+                'items': []
+            }
+            
+            for source in sources:
+                source_item = {
+                    'type': 'list_item',
+                    'content': f"{source.get('title', 'Unknown')} - {source.get('source', 'Unknown')}",
+                    'url': source.get('url', '')
+                }
+                sources_list['items'].append(source_item)
+            
+            sections.append(sources_list)
         
         # Analyze for plagiarism even in mock content
+        body_text = ' '.join([section['content'] for section in sections if section['type'] == 'paragraph'])
         plagiarism_analysis = self.plagiarism_checker.analyze_content_for_plagiarism(
-            body, sources or []
+            body_text, sources or []
         )
         
         # Validate source quality
@@ -165,7 +189,7 @@ class AIContentGenerator:
         
         return {
             'title': title,
-            'body': body.strip(),
+            'sections': sections,
             'sources': sources or [],
             'status': 'pending',
             'plagiarism_analysis': plagiarism_analysis,
@@ -201,11 +225,33 @@ class AIContentGenerator:
         - Provide proper attribution to sources
         - Include a "Sources and Further Reading" section at the end
         
-        Please provide the article in this format:
+        Please provide the article in this JSON format:
         
-        TITLE: [Engaging title here]
-        
-        BODY: [Article content here with HTML formatting]
+        {{
+            "title": "Engaging title here",
+            "sections": [
+                {{
+                    "type": "heading",
+                    "level": 2,
+                    "content": "Section heading"
+                }},
+                {{
+                    "type": "paragraph",
+                    "content": "Paragraph content here"
+                }},
+                {{
+                    "type": "list",
+                    "style": "unordered",
+                    "items": [
+                        {{
+                            "type": "list_item",
+                            "content": "List item content",
+                            "url": "optional_url"
+                        }}
+                    ]
+                }}
+            ]
+        }}
         
         Writing guidelines:
         - Make the content engaging and informative
@@ -220,30 +266,45 @@ class AIContentGenerator:
     
     def _parse_ai_response(self, content: str) -> Dict:
         """Parse AI response into structured content"""
-        lines = content.split('\n')
-        title = ""
-        body = ""
-        
-        current_section = None
-        
-        for line in lines:
-            line = line.strip()
-            if not line:
-                continue
-                
-            if line.startswith('TITLE:'):
-                current_section = 'title'
-                title = line.replace('TITLE:', '').strip()
-            elif line.startswith('BODY:'):
-                current_section = 'body'
-                body = line.replace('BODY:', '').strip()
-            elif current_section == 'body':
-                body += ' ' + line
-        
-        return {
-            'title': title,
-            'body': body.strip()
-        }
+        try:
+            # Try to parse as JSON first
+            import json
+            parsed = json.loads(content)
+            return parsed
+        except json.JSONDecodeError:
+            # Fallback to old format parsing
+            lines = content.split('\n')
+            title = ""
+            body = ""
+            
+            current_section = None
+            
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+                    
+                if line.startswith('TITLE:'):
+                    current_section = 'title'
+                    title = line.replace('TITLE:', '').strip()
+                elif line.startswith('BODY:'):
+                    current_section = 'body'
+                    body = line.replace('BODY:', '').strip()
+                elif current_section == 'body':
+                    body += ' ' + line
+            
+            # Convert old format to new structured format
+            sections = [
+                {
+                    'type': 'paragraph',
+                    'content': body.strip()
+                }
+            ]
+            
+            return {
+                'title': title,
+                'sections': sections
+            }
     
     def validate_article_originality(self, content: str, sources: List[Dict]) -> Dict:
         """
@@ -286,7 +347,12 @@ class AIContentGenerator:
             if not scraped_articles:
                 return {
                     'title': f"Top 3 {site_description}: No Articles Available",
-                    'body': f"<p>Currently, there are limited trending articles available for {site_description}. Please check back later for the latest updates.</p>",
+                    'sections': [
+                        {
+                            'type': 'paragraph',
+                            'content': f"Currently, there are limited trending articles available for {site_description}. Please check back later for the latest updates."
+                        }
+                    ],
                     'sources': []
                 }
             
@@ -314,10 +380,29 @@ class AIContentGenerator:
             else:
                 overall_summary = self._create_overall_summary(scraped_articles[:3], site_description)
             
-            # Create individual article summaries with proper formatting
-            article_summaries = []
-            sources = []
+            # Create structured sections
+            sections = []
             
+            # Overview section
+            sections.append({
+                'type': 'heading',
+                'level': 2,
+                'content': "Today's Trending Summary"
+            })
+            sections.append({
+                'type': 'paragraph',
+                'content': overall_summary
+            })
+            
+            # Articles section
+            sections.append({
+                'type': 'heading',
+                'level': 2,
+                'content': "Top Stories"
+            })
+            
+            # Add individual articles
+            sources = []
             for i, article in enumerate(scraped_articles[:3]):
                 title = article.get('title', '')
                 url = article.get('url', '')
@@ -326,24 +411,27 @@ class AIContentGenerator:
                 category = article.get('category', 'General')
                 main_topic = main_topics[i] if i < len(main_topics) else 'General'
                 
-                # Use the summary as-is (no enhancement needed)
-                article_summary = summary
+                # Article heading
+                sections.append({
+                    'type': 'heading',
+                    'level': 3,
+                    'content': title,
+                    'url': url
+                })
                 
-                # Create clickable title link
-                title_link = f'<a href="{url}" target="_blank" rel="noopener noreferrer" class="article-title-link">{title}</a>' if url else title
+                # Article summary
+                sections.append({
+                    'type': 'paragraph',
+                    'content': summary
+                })
                 
-                # Create individual summary with proper HTML formatting
-                individual_summary = f"""
-                <div class="article-item">
-                    <h3><strong>{title_link}</strong></h3>
-                    <p class="article-summary">{article_summary}</p>
-                    <div class="article-meta">
-                        <span class="category">{main_topic}</span>
-                        <span class="source">Source: <a href="{url}" target="_blank" rel="noopener noreferrer">{source}</a></span>
-                    </div>
-                </div>
-                """
-                article_summaries.append(individual_summary)
+                # Article metadata
+                sections.append({
+                    'type': 'metadata',
+                    'category': main_topic,
+                    'source': source,
+                    'url': url
+                })
                 
                 # Add to sources list
                 sources.append({
@@ -352,31 +440,32 @@ class AIContentGenerator:
                     'source': source
                 })
             
-            # Combine everything into the final article with proper HTML structure
-            article_body = f"""
-            <div class="daily-top-3">
-                <div class="overview">
-                    <h2><strong>Today's Trending Summary</strong></h2>
-                    <p>{overall_summary}</p>
-                </div>
-                
-                <div class="articles">
-                    <h2><strong>Top Stories</strong></h2>
-                    {''.join(article_summaries)}
-                </div>
-                
-                <div class="sources">
-                    <h3><strong>Sources and Further Reading</strong></h3>
-                    <ul>
-                        {''.join([f'<li><a href="{source["url"]}" target="_blank" rel="noopener noreferrer">{source["title"]}</a> - {source["source"]}</li>' for source in sources])}
-                    </ul>
-                </div>
-            </div>
-            """
+            # Sources section
+            sections.append({
+                'type': 'heading',
+                'level': 3,
+                'content': "Sources and Further Reading"
+            })
+            
+            sources_list = {
+                'type': 'list',
+                'style': 'unordered',
+                'items': []
+            }
+            
+            for source in sources:
+                source_item = {
+                    'type': 'list_item',
+                    'content': f"{source['title']} - {source['source']}",
+                    'url': source['url']
+                }
+                sources_list['items'].append(source_item)
+            
+            sections.append(sources_list)
             
             return {
                 'title': main_title,
-                'body': article_body,
+                'sections': sections,
                 'sources': sources
             }
             
@@ -384,7 +473,12 @@ class AIContentGenerator:
             print(f"Error generating Daily Top 3 article: {e}")
             return {
                 'title': f"Top 3 {site_description}: Error Generating Content",
-                'body': f"<p>Error generating content for {site_description}. Please try again later.</p>",
+                'sections': [
+                    {
+                        'type': 'paragraph',
+                        'content': f"Error generating content for {site_description}. Please try again later."
+                    }
+                ],
                 'sources': []
             }
     
