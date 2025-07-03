@@ -41,10 +41,13 @@ class ContentAutomation:
             # Create article slug from title
             slug = self._create_slug(article_data['title'])
             
+            # Convert structured sections to HTML for storage
+            body_html = self._convert_sections_to_html(article_data.get('sections', []))
+            
             # Create the article
             article = Article.objects.create(
                 title=article_data['title'],
-                body=article_data['body'],
+                body=body_html,
                 slug=slug,
                 site=site,
                 status='pending',
@@ -98,10 +101,13 @@ class ContentAutomation:
             # Create article slug from title
             slug = self._create_slug(article_data['title'])
             
+            # Convert structured sections to HTML for storage
+            body_html = self._convert_sections_to_html(article_data.get('sections', []))
+            
             # Create the article (only use fields that exist in the model)
             article = Article.objects.create(
                 title=article_data['title'],
-                body=article_data['body'],
+                body=body_html,
                 slug=slug,
                 site=site,
                 status='pending',
@@ -280,10 +286,13 @@ class ContentAutomation:
             # Create article slug from title
             slug = self._create_slug(article_data['title'])
             
+            # Convert structured sections to HTML for storage
+            body_html = self._convert_sections_to_html(article_data.get('sections', []))
+            
             # Create the article
             article = Article.objects.create(
                 title=article_data['title'],
-                body=article_data['body'],
+                body=body_html,
                 slug=slug,
                 site=site,
                 status='pending',
@@ -325,10 +334,13 @@ class ContentAutomation:
             # Create article slug from title
             slug = self._create_slug(article_data['title'])
             
+            # Convert structured sections to HTML for storage
+            body_html = self._convert_sections_to_html(article_data.get('sections', []))
+            
             # Create the article
             article = Article.objects.create(
                 title=article_data['title'],
-                body=article_data['body'],
+                body=body_html,
                 slug=slug,
                 site=site,
                 status='pending',
@@ -340,4 +352,76 @@ class ContentAutomation:
             
         except Exception as e:
             print(f"Error generating Daily Top 3 for site {site.name}: {e}")
-            return None 
+            return None
+
+    def _convert_sections_to_html(self, sections: List[Dict]) -> str:
+        """
+        Convert a list of sections to HTML format
+        
+        Args:
+            sections: List of section dictionaries
+            
+        Returns:
+            HTML formatted string
+        """
+        html_parts = []
+        
+        for section in sections:
+            section_type = section.get('type', 'paragraph')
+            
+            if section_type == 'heading':
+                level = section.get('level', 2)
+                content = section.get('content', '')
+                url = section.get('url', '')
+                
+                if url:
+                    html_parts.append(f"<h{level}><a href='{url}' target='_blank' rel='noopener noreferrer'>{content}</a></h{level}>")
+                else:
+                    html_parts.append(f"<h{level}>{content}</h{level}>")
+                    
+            elif section_type == 'paragraph':
+                content = section.get('content', '')
+                html_parts.append(f"<p>{content}</p>")
+                
+            elif section_type == 'list':
+                style = section.get('style', 'unordered')
+                items = section.get('items', [])
+                
+                if style == 'unordered':
+                    html_parts.append("<ul>")
+                    for item in items:
+                        content = item.get('content', '')
+                        url = item.get('url', '')
+                        if url:
+                            html_parts.append(f"<li><a href='{url}' target='_blank' rel='noopener noreferrer'>{content}</a></li>")
+                        else:
+                            html_parts.append(f"<li>{content}</li>")
+                    html_parts.append("</ul>")
+                else:
+                    html_parts.append("<ol>")
+                    for item in items:
+                        content = item.get('content', '')
+                        url = item.get('url', '')
+                        if url:
+                            html_parts.append(f"<li><a href='{url}' target='_blank' rel='noopener noreferrer'>{content}</a></li>")
+                        else:
+                            html_parts.append(f"<li>{content}</li>")
+                    html_parts.append("</ol>")
+                    
+            elif section_type == 'metadata':
+                category = section.get('category', '')
+                source = section.get('source', '')
+                url = section.get('url', '')
+                
+                meta_html = "<div class='article-meta'>"
+                if category:
+                    meta_html += f"<span class='category'>{category}</span>"
+                if source:
+                    if url:
+                        meta_html += f"<span class='source'>Source: <a href='{url}' target='_blank' rel='noopener noreferrer'>{source}</a></span>"
+                    else:
+                        meta_html += f"<span class='source'>Source: {source}</span>"
+                meta_html += "</div>"
+                html_parts.append(meta_html)
+        
+        return '\n'.join(html_parts) 
